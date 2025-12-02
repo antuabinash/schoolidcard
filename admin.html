@@ -304,7 +304,7 @@ function updateGenerateCount(){
     }
 }
 
-/* ---------- AI Engine ---------- */
+/* ---------- AI Engine (Standard Loader) ---------- */
 let FaceDetector=null, FilesetResolver=null, faceDetector=null;
 async function initializeFaceDetector(){
   window.assets.aiModel = 'pending'; updateStatus();
@@ -345,7 +345,7 @@ document.getElementById('fontInput').onchange = async e => {
     updateStatus();
 }
 
-/* ---------- Generation Logic ---------- */
+/* ---------- Generation Logic (Old Crop + Centered A4) ---------- */
 async function generateCardImage(student){
   cardCanvas.width = CARD_W; cardCanvas.height = CARD_H;
   ctx.clearRect(0,0,CARD_W,CARD_H);
@@ -358,8 +358,9 @@ async function generateCardImage(student){
   const scale = CARD_W / tplW;
   const px = Math.round(ORIG_PX * scale), py = Math.round(ORIG_PY * scale);
   const pw = Math.round(ORIG_PW * scale), ph = Math.round(ORIG_PH * scale);
-  
-  ctx.fillStyle = '#000'; ctx.fillRect(px - 3, py - 3, pw + 6, ph + 6);
+  const border = Math.max(2, Math.round(3 * scale));
+
+  ctx.fillStyle = '#000'; ctx.fillRect(px - border, py - border, pw + border*2, ph + border*2);
 
   const photo = new Image(); photo.crossOrigin = "Anonymous";
   if(student.photoBase64){
@@ -368,20 +369,32 @@ async function generateCardImage(student){
   }
 
   let sx=0, sy=0, sW=photo.width||1, sH=photo.height||1;
+  
   if(photo.width && faceDetector && window.assets.aiModel === 'loaded'){
       try {
           const det = faceDetector.detect(photo);
-          if(det.detections.length>0){
-              const box = det.detections[0].boundingBox;
-              const cx = box.originX + box.width/2; const cy = box.originY + box.height/2;
-              const targetW = box.width * 2.0; const targetH = targetW / 0.83;
-              sx = Math.max(0, cx - targetW/2); sy = Math.max(0, cy - targetH/2.2);
-              sW = Math.min(photo.width - sx, targetW); sH = Math.min(photo.height - sy, targetH);
+          if(det && det.detections && det.detections.length>0){
+              const bbox = det.detections[0].boundingBox;
+              const img_w = photo.width, img_h = photo.height;
+              let x1=bbox.originX, y1=bbox.originY, x2=bbox.originX + bbox.width, y2=bbox.originY + bbox.height;
+              const bw = x2-x1, bh = y2-y1;
+              const add_w = parseInt(bw * 0.6); 
+              const add_h = parseInt(bh * 1.4); 
+              const new_x1 = Math.max(0, x1 - add_w/2);
+              const new_y1 = Math.max(0, y1 - add_h/2);
+              const new_x2 = Math.min(img_w, x2 + add_w/2);
+              const new_y2 = Math.min(img_h, y2 + add_h/2);
+              sx = new_x1; sy = new_y1; sW = new_x2 - new_x1; sH = new_y2 - new_y1;
+          } else {
+             const targetRatio = pw / ph; const srcRatio = sW / sH;
+             if(srcRatio > targetRatio){ sW = sH * targetRatio; sx=(photo.width - sW)/2; } 
+             else { sH = sW / targetRatio; sy=(photo.height - sH)/2; }
           }
       } catch(e){}
   } else {
-      const tr = pw/ph; const sr = sW/sH;
-      if(sr > tr) { sW = sH*tr; sx=(photo.width-sW)/2; } else { sH = sW/tr; sy=(photo.height-sH)/2; }
+      const targetRatio = pw / ph; const srcRatio = sW / sH;
+      if(srcRatio > targetRatio){ sW = sH * targetRatio; sx=(photo.width - sW)/2; } 
+      else { sH = sW / targetRatio; sy=(photo.height - sH)/2; }
   }
   
   if(photo.width) ctx.drawImage(photo, sx, sy, sW, sH, px, py, pw, ph);
@@ -452,16 +465,23 @@ generateBtn.onclick = async () => {
         generatorStatus.textContent = "A4 Sheets...";
         const pageCanvas = document.createElement('canvas'); pageCanvas.width=A4_W; pageCanvas.height=A4_H;
         const pctx = pageCanvas.getContext('2d');
-        const cellW = Math.floor(A4_W/5), cellH = Math.floor(A4_H/2);
+        
+        // --- NEW CENTERED A4 LAYOUT (40px Gap) ---
+        const GAP_X = 40; const GAP_Y = 40; 
+        const totalGridW = (5 * CARD_W) + (4 * GAP_X);
+        const totalGridH = (2 * CARD_H) + (1 * GAP_Y);
+        const startX = (A4_W - totalGridW) / 2;
+        const startY = (A4_H - totalGridH) / 2;
         
         for(let i=0; i<singleImages.length; i+=10){
             pctx.fillStyle='white'; pctx.fillRect(0,0,A4_W,A4_H);
             const chunk = singleImages.slice(i, i+10);
             chunk.forEach((item, idx) => {
                 const col = idx % 5; const row = Math.floor(idx / 5);
-                const x = col*cellW + (cellW-item.img.width)/2;
-                const y = row*cellH + (cellH-item.img.height)/2;
+                const x = startX + col * (CARD_W + GAP_X);
+                const y = startY + row * (CARD_H + GAP_Y);
                 pctx.drawImage(item.img, x, y);
+                pctx.strokeStyle='#ddd'; pctx.lineWidth=1; pctx.strokeRect(x,y,CARD_W,CARD_H); // Cut lines
             });
             const pBlob = await new Promise(r => pageCanvas.toBlob(r, 'image/jpeg', 0.9));
             zip.file(`A4_Print_Page_${Math.floor(i/10)+1}.jpg`, pBlob);
@@ -501,7 +521,7 @@ document.getElementById('downloadZipBtn').onclick = async () => {
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download='Backup.zip'; a.click();
 }
 
-/* ---------- EDIT & DELETE HANDLERS (New) ---------- */
+/* ---------- EDIT & DELETE HANDLERS ---------- */
 window.confirmDelete = function(id, name){
     idToDelete = id; document.getElementById('confirmText').textContent = `Delete ${name}?`;
     document.getElementById('confirmModal').style.display='flex';
