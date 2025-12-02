@@ -18,7 +18,7 @@
         h1, h2 { color: #0056b3; }
         
         .card {
-            max-width: 1200px; /* Made wider for new columns */
+            max-width: 1200px; 
             margin: 0 auto 20px auto;
             padding: 20px;
             background-color: #ffffff;
@@ -27,7 +27,9 @@
         }
 
         /* Controls */
-        .controls { margin-bottom: 20px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: space-between; }
+        .controls { margin-bottom: 20px; display: flex; gap: 15px; align-items: center; flex-wrap: wrap; justify-content: space-between; }
+        .control-group { display: flex; gap: 10px; align-items: center; }
+        
         select, button, input[type="file"] { padding: 10px; font-size: 14px; border-radius: 4px; border: 1px solid #ccc; }
         button { background: #28a745; color: white; border: none; cursor: pointer; font-weight: 600; }
         button:disabled { background: #999; cursor: not-allowed; }
@@ -35,6 +37,22 @@
         
         #downloadZipBtn { background: #ffc107; color: #333; }
         #refreshBtn { background: #17a2b8; color: white; }
+
+        /* HM Info Panel */
+        #hmInfoPanel {
+            display: none; /* Hidden by default */
+            align-items: center;
+            gap: 15px;
+            background: #e3f2fd;
+            padding: 8px 15px;
+            border-radius: 8px;
+            border: 1px solid #90caf9;
+            font-size: 14px;
+        }
+        .hm-phone { color: #0277bd; font-weight: bold; }
+        .hm-sign-thumb { height: 30px; border: 1px solid #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1); background: white; }
+        .hm-download { color: #0056b3; text-decoration: none; font-size: 12px; display: flex; align-items: center; gap: 4px; }
+        .hm-download:hover { text-decoration: underline; }
 
         /* Table Styling */
         table { width: 100%; border-collapse: collapse; background: white; margin-top: 20px; font-size: 14px; }
@@ -91,15 +109,21 @@
 
     <div class="card">
         <div class="controls">
-            <div>
-                <label><strong>Filter School:</strong></label>
+            <div class="control-group">
                 <select id="schoolFilter">
                     <option value="all">All Schools</option>
                 </select>
+                
+                <div id="hmInfoPanel">
+                    <span id="hmPhoneDisplay" class="hm-phone"></span>
+                    <img id="hmSignDisplay" class="hm-sign-thumb" src="">
+                    <a id="hmSignDownload" href="#" download="hm_signature.png" class="hm-download">⬇ Sign</a>
+                </div>
             </div>
-            <div>
-                <button id="refreshBtn">🔄 Refresh Data</button>
-                <button id="downloadZipBtn">💾 Backup All (ZIP)</button>
+
+            <div class="control-group">
+                <button id="refreshBtn">🔄 Refresh</button>
+                <button id="downloadZipBtn">💾 Backup (ZIP)</button>
             </div>
         </div>
 
@@ -157,6 +181,12 @@
         const schoolFilter = document.getElementById('schoolFilter');
         const selectAllCheckbox = document.getElementById('selectAll');
         
+        // HM Elements
+        const hmInfoPanel = document.getElementById('hmInfoPanel');
+        const hmPhoneDisplay = document.getElementById('hmPhoneDisplay');
+        const hmSignDisplay = document.getElementById('hmSignDisplay');
+        const hmSignDownload = document.getElementById('hmSignDownload');
+
         // Modal Elements
         const confirmModal = document.getElementById('confirmModal');
         const cropModal = document.getElementById('cropModal');
@@ -225,12 +255,48 @@
         function filterAndRender() {
             const val = schoolFilter.value;
             const data = (val === 'all') ? allStudents : allStudents.filter(s => s.schoolName === val);
+            
+            // --- NEW: Update HM Info Logic ---
+            updateHMInfo(val, data);
+            
             renderTable(data);
+        }
+
+        function updateHMInfo(schoolName, data) {
+            // Hide if "All Schools" is selected or no data
+            if(schoolName === 'all' || data.length === 0) {
+                hmInfoPanel.style.display = 'none';
+                return;
+            }
+
+            // Find first student with HM info
+            const refStudent = data.find(s => s.hmPhone || s.hmSignature);
+            
+            if(refStudent) {
+                hmInfoPanel.style.display = 'flex';
+                
+                // Phone
+                hmPhoneDisplay.textContent = refStudent.hmPhone ? `📞 ${refStudent.hmPhone}` : '';
+                
+                // Signature
+                if(refStudent.hmSignature) {
+                    hmSignDisplay.src = refStudent.hmSignature;
+                    hmSignDisplay.style.display = 'block';
+                    hmSignDownload.href = refStudent.hmSignature;
+                    hmSignDownload.download = `${schoolName}_HM_Sign.png`;
+                    hmSignDownload.style.display = 'flex';
+                } else {
+                    hmSignDisplay.style.display = 'none';
+                    hmSignDownload.style.display = 'none';
+                }
+            } else {
+                hmInfoPanel.style.display = 'none';
+            }
         }
 
         function renderTable(data) {
             tableBody.innerHTML = '';
-            selectAllCheckbox.checked = false; // Reset select all
+            selectAllCheckbox.checked = false; 
             updateGenerateBtnCount();
 
             if (data.length === 0) {
@@ -260,7 +326,6 @@
                 tableBody.appendChild(row);
             });
 
-            // Re-attach event listeners for checkboxes
             document.querySelectorAll('.student-select').forEach(cb => {
                 cb.addEventListener('change', updateGenerateBtnCount);
             });
@@ -276,13 +341,12 @@
         function updateGenerateBtnCount() {
             const count = document.querySelectorAll('.student-select:checked').length;
             const btn = document.getElementById('generateBtn');
-            const status = document.getElementById('generatorStatus').textContent;
-            
-            // Only enable if resources are loaded (checked via button text usually, but here just UI)
             if(count > 0) {
                 btn.innerHTML = `Generate <strong>${count}</strong> Selected Cards`;
+                btn.disabled = false;
             } else {
                 btn.innerHTML = `Select Students First`;
+                btn.disabled = true;
             }
         }
 
@@ -304,7 +368,6 @@
             if (idToDelete) {
                 window.db.collection("students").doc(idToDelete.toString()).delete()
                 .then(() => {
-                    // Update local array immediately
                     allStudents = allStudents.filter(s => s.id.toString() !== idToDelete.toString());
                     window.allStudents = allStudents;
                     filterAndRender();
@@ -358,7 +421,7 @@
                 
                 const excelData = allStudents.map((s, i) => ({
                     SN: i+1, Name: s.name, Class: s.class, Roll: s.roll, DOB: s.dob, 
-                    School: s.schoolName, PhotoFile: s.newPhotoName
+                    School: s.schoolName, HM_Phone: s.hmPhone||'', PhotoFile: s.newPhotoName
                 }));
                 const ws = XLSX.utils.json_to_sheet(excelData);
                 const wb = XLSX.utils.book_new();
@@ -371,7 +434,7 @@
                 a.download = `Full_Backup_${new Date().toISOString().slice(0,10)}.zip`;
                 a.click();
             } catch(e) { console.error(e); } 
-            btn.disabled = false; btn.textContent = "💾 Backup All (ZIP)";
+            btn.disabled = false; btn.textContent = "💾 Backup (ZIP)";
         };
     </script>
     
@@ -385,7 +448,6 @@
         const canvas = document.getElementById('cardCanvas');
         const ctx = canvas.getContext('2d');
 
-        // 1. Initialize AI
         async function initAI() {
             try {
                 const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
@@ -397,13 +459,12 @@
                 checkReady();
             } catch(e) { 
                 statusMsg.textContent += " ⚠️ AI Failed (Will use center crop)";
-                assets.aiReady = true; // Allow proceed without AI
+                assets.aiReady = true; 
                 checkReady();
             }
         }
         initAI();
 
-        // 2. Handle Inputs
         document.getElementById('templateInput').onchange = (e) => {
             if(e.target.files[0]) {
                 const img = new Image();
@@ -428,8 +489,6 @@
             const f = assets.font ? '✅' : '❌';
             const a = assets.aiReady ? '✅' : '⏳';
             statusMsg.textContent = `Template: ${t} | Font: ${f} | AI: ${a}`;
-            
-            // Enable logic inside click handler, visual logic handled by selection
         }
 
         function toOdia(str) {
@@ -437,7 +496,6 @@
             return str.toString().replace(/[0-9]/g, d => window.odiaDigits[d]);
         }
 
-        // 3. GENERATE LOGIC
         generateBtn.addEventListener('click', async () => {
             if(!assets.template || !assets.font) return alert("Upload Template & Font first!");
             
@@ -475,11 +533,11 @@
                 ctx.clearRect(0,0,canvas.width,canvas.height);
                 ctx.drawImage(assets.template, 0, 0);
 
-                // --- TEXT DRAWING ---
                 ctx.fillStyle = "black";
                 ctx.textBaseline = "alphabetic";
                 ctx.font = "38px OdiaFont"; 
-                // Adjust positions based on your template coordinates
+                
+                // Adjust coordinates as per your template
                 ctx.fillText(student.name || "", 227, 543);
                 ctx.fillText(student.class || "", 227, 613);
                 
@@ -497,40 +555,33 @@
                     ctx.fillText(student.bloodGroup, 480, 383);
                 }
 
-                // --- PHOTO DRAWING (With AI) ---
                 const photo = new Image();
                 photo.crossOrigin = "Anonymous";
                 photo.src = student.photoBase64;
                 photo.onload = () => {
                     const px=222, py=250, pw=187, ph=225, border=3;
                     
-                    // Draw Black Border
                     ctx.fillStyle = "black";
                     ctx.fillRect(px-border, py-border, pw+border*2, ph+border*2);
 
                     let sx=0, sy=0, sw=photo.width, sh=photo.height;
 
-                    // AI Detection
                     if(assets.aiReady && faceDetector) {
                         try {
                             const result = faceDetector.detect(photo);
                             if(result.detections.length > 0) {
                                 const box = result.detections[0].boundingBox;
-                                // Expand box for passport style
                                 const cx = box.originX + box.width/2;
                                 const cy = box.originY + box.height/2;
                                 
-                                // ID card ratio is roughly 0.83 (187/225)
-                                // We want the face to be about 60% of width
                                 const targetW = box.width * 2.0; 
                                 const targetH = targetW / 0.83;
 
                                 sx = Math.max(0, cx - targetW/2);
-                                sy = Math.max(0, cy - targetH/2.2); // Move up slightly
+                                sy = Math.max(0, cy - targetH/2.2);
                                 sw = Math.min(photo.width - sx, targetW);
                                 sh = Math.min(photo.height - sy, targetH);
                             } else {
-                                // Fallback: Center Crop
                                 const aspect = pw/ph;
                                 if(sw/sh > aspect) { sw = sh*aspect; sx=(photo.width-sw)/2; }
                                 else { sh = sw/aspect; sy=(photo.height-sh)/2; }
@@ -541,7 +592,7 @@
                     ctx.drawImage(photo, sx, sy, sw, sh, px, py, pw, ph);
                     canvas.toBlob(resolve, 'image/png');
                 };
-                photo.onerror = () => resolve(null); // Resolve even if error to continue loop
+                photo.onerror = () => resolve(null);
             });
         }
     </script>
