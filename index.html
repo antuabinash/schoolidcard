@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Data App</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: #f4f7f6;
+            margin: 0;
+            text-align: center;
+        }
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #0056b3;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        button {
+            background-color: #28a745;
+            color: white;
+            padding: 15px 30px;
+            font-size: 18px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: none; /* Hidden by default */
+        }
+        h2 { color: #333; margin-top: 0; }
+        p { color: #666; max-width: 300px; line-height: 1.5; }
+    </style>
+</head>
+<body>
+
+    <div id="loadingUI">
+        <div class="loader"></div>
+        <h2>Checking App Status...</h2>
+    </div>
+
+    <div id="installUI" style="display:none;">
+        <img src="icon-192.png" style="width: 80px; border-radius: 15px; margin-bottom: 20px;">
+        <h2>Install App</h2>
+        <p>Please install the app to manage student data offline.</p>
+        <button id="installBtn">📲 Install Now</button>
+    </div>
+
+    <script>
+        // 1. Check if running as Installed App (Standalone)
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+
+        if (isStandalone) {
+            // Already installed -> Go straight to App
+            window.location.replace("app.html");
+        } else {
+            // Browser mode -> Show Install UI
+            document.getElementById('loadingUI').style.display = 'none';
+            document.getElementById('installUI').style.display = 'block';
+        }
+
+        // 2. Handle Installation
+        let deferredPrompt;
+        const installBtn = document.getElementById('installBtn');
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            installBtn.style.display = 'block';
+        });
+
+        installBtn.addEventListener('click', async () => {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                if (outcome === 'accepted') {
+                    // If they accepted, we can redirect or wait for them to open from home screen
+                    console.log('User installed');
+                }
+                deferredPrompt = null;
+            }
+        });
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js');
+        }
+    </script>
+</body>
+</html>
