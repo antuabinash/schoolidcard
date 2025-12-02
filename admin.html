@@ -12,48 +12,46 @@
 
   <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
-  
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
 
   <style>
     body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Oriya", sans-serif; padding:20px; background:#f4f7f6; color:#222; }
     .card { max-width:1200px; margin:12px auto; padding:18px; background:#fff; border-radius:8px; box-shadow:0 6px 18px rgba(0,0,0,0.04); }
     h1{ color:#0b53a0; margin:0 0 12px 0; }
     
-    /* Controls Grid */
     .controls { display:flex; gap:15px; flex-wrap:wrap; align-items:center; margin-bottom:12px; justify-content: space-between; }
     .control-group { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     
-    select,input[type=file],button { padding:10px; border-radius:6px; border:1px solid #ccc; font-size:14px; }
+    select,input,button { padding:10px; border-radius:6px; border:1px solid #ccc; font-size:14px; box-sizing: border-box; }
     button{ background:#28a745;color:#fff;border:none;cursor:pointer; font-weight: 600; }
     button:disabled{ background:#999; cursor:not-allowed; }
     #downloadZipBtn{ background:#ffc107;color:#222; }
     #refreshBtn{ background:#17a2b8; }
     
-    /* HM Info Panel */
     #hmInfoPanel { display: none; align-items: center; gap: 10px; background: #e3f2fd; padding: 5px 12px; border-radius: 6px; border: 1px solid #90caf9; font-size: 13px; }
     .hm-sign-thumb { height: 30px; border: 1px solid #fff; background: white; }
     
-    /* Table */
     table{ width:100%; border-collapse:collapse; margin-top:10px; font-size: 14px; }
     th,td{ padding:8px 10px; border:1px solid #e6eef6; vertical-align:middle; text-align:left; }
     th{ background:#0b69d1; color:#fff; position: sticky; top: 0; }
     img.thumb{ width:40px; height:40px; object-fit:cover; border-radius:4px; cursor:pointer; }
     
-    /* Checkbox & SN Columns */
     .checkbox-col { width: 30px; text-align: center; }
     .sn-col { width: 40px; text-align: center; font-weight: bold; color: #555; }
     input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
 
-    /* Generator Grid */
     .generator-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:end; }
     
     /* Modals */
     .modal{ display:none; position:fixed; left:0; top:0; right:0; bottom:0; background:rgba(0,0,0,0.55); align-items:center; justify-content:center; z-index:2000}
-    .modal-content{ background:#fff; padding:18px; border-radius:8px; width:90%; max-width:500px; text-align: center; }
-    .modal-buttons{ display:flex; gap:10px; margin-top:12px; justify-content: center; }
+    .modal-content{ background:#fff; padding:20px; border-radius:8px; width:90%; max-width:500px; text-align: left; }
+    .modal-buttons{ display:flex; gap:10px; margin-top:20px; justify-content: flex-end; }
     
+    /* Edit Form Styles */
+    .form-row { display: flex; gap: 10px; margin-bottom: 10px; }
+    .form-group { flex: 1; }
+    .form-group label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #555; }
+    .form-group input, .form-group select { width: 100%; }
+
     @media(max-width:720px){ .generator-grid{ grid-template-columns:1fr } table{ font-size:12px } }
   </style>
 </head>
@@ -80,14 +78,12 @@
     <div class="controls">
       <div class="control-group">
         <select id="schoolFilter"><option value="all">All Schools</option></select>
-        
         <div id="hmInfoPanel">
              <span id="hmPhoneDisplay" style="color:#0277bd; font-weight:bold;"></span>
              <img id="hmSignDisplay" class="hm-sign-thumb" src="">
              <a id="hmSignDownload" href="#" download="sign.png" style="font-size:12px;">⬇ Sign</a>
         </div>
       </div>
-      
       <div class="control-group">
         <button id="refreshBtn">🔄 Refresh</button>
         <button id="downloadZipBtn">💾 Raw Backup (ZIP)</button>
@@ -109,37 +105,86 @@
 
   <canvas id="cardCanvas" style="display:none;"></canvas>
 
-  <div id="confirmModal" class="modal"><div class="modal-content">
+  <div id="confirmModal" class="modal"><div class="modal-content" style="text-align:center;">
     <p id="confirmText">Are you sure?</p>
-    <div class="modal-buttons"><button id="confirmYesBtn" style="background:#dc3545;color:#fff">Yes, delete</button><button id="confirmNoBtn">Cancel</button></div>
+    <div class="modal-buttons" style="justify-content:center;">
+        <button id="confirmYesBtn" style="background:#dc3545;color:#fff">Yes, delete</button>
+        <button id="confirmNoBtn">Cancel</button>
+    </div>
   </div></div>
 
-  <div id="deleteAllModal" class="modal"><div class="modal-content">
+  <div id="editModal" class="modal">
+    <div class="modal-content">
+        <h3 style="margin-top:0;">Edit Student Details</h3>
+        <input type="hidden" id="editId">
+        
+        <div class="form-group">
+            <label>Full Name</label>
+            <input type="text" id="editName">
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label>Class</label>
+                <input type="text" id="editClass">
+            </div>
+            <div class="form-group">
+                <label>Roll No</label>
+                <input type="text" id="editRoll">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label>Date of Birth</label>
+                <input type="date" id="editDob">
+            </div>
+            <div class="form-group">
+                <label>Blood Group</label>
+                <select id="editBlood">
+                    <option value="">Select</option>
+                    <option value="A+">A+</option><option value="A-">A-</option>
+                    <option value="B+">B+</option><option value="B-">B-</option>
+                    <option value="O+">O+</option><option value="O-">O-</option>
+                    <option value="AB+">AB+</option><option value="AB-">AB-</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Phone Number</label>
+            <input type="text" id="editPhone">
+        </div>
+
+        <div class="modal-buttons">
+            <button id="saveEditBtn">Save Changes</button>
+            <button id="cancelEditBtn" style="background:#6c757d;">Cancel</button>
+        </div>
+    </div>
+  </div>
+
+  <div id="deleteAllModal" class="modal"><div class="modal-content" style="text-align:center;">
     <p id="deleteAllText">Delete ALL student records?</p>
-    <div class="modal-buttons"><button id="deleteAllYesBtn" style="background:#dc3545;color:#fff">Delete All</button><button id="deleteAllNoBtn">Cancel</button></div>
-  </div></div>
-  
-  <div id="cropModal" class="modal"><div class="modal-content" style="max-width:90vw;">
-    <h3>Crop Photo</h3>
-    <div style="max-height:60vh; overflow:hidden;"><img id="cropImage" src="" style="max-width:100%;"></div>
-    <div class="modal-buttons"><button id="saveCropBtn">Save</button><button id="cancelCropBtn" style="background:#6c757d">Cancel</button></div>
+    <div class="modal-buttons" style="justify-content:center;">
+        <button id="deleteAllYesBtn" style="background:#dc3545;color:#fff">Delete All</button>
+        <button id="deleteAllNoBtn">Cancel</button>
+    </div>
   </div></div>
 
 <script>
 /* ---------- Constants ---------- */
 const DPI = 300;
-const CARD_MM_W = 54.0, CARD_MM_H = 85.6; // Portrait
+const CARD_MM_W = 54.0, CARD_MM_H = 85.6; 
 const CARD_W = Math.round((CARD_MM_W / 25.4) * DPI);
 const CARD_H = Math.round((CARD_MM_H / 25.4) * DPI);
 const A4_W = 3508, A4_H = 2480;
-const GRID_COLS = 5, GRID_ROWS = 2;
 
 /* ---------- Helpers ---------- */
 window.odiaDigits = ['୦','୧','୨','୩','୪','୫','୬','୭','୮','୯'];
 function toOdiaDigits(str){ if (str===undefined||str===null) return ''; return (''+str).replace(/\d/g,d=>window.odiaDigits[d]||d); }
 function escapeHtml(s){ return (s+'').replace(/[&<>"'`]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;'}[c])); }
 
-/* ---------- DOM Elements ---------- */
+/* ---------- DOM ---------- */
 const tableBody = document.querySelector('#studentTable tbody');
 const schoolFilter = document.getElementById('schoolFilter');
 const selectAllCheckbox = document.getElementById('selectAll');
@@ -154,8 +199,6 @@ const generateBtn = document.getElementById('generateBtn');
 let db = null;
 let allStudents = [];
 let idToDelete = null;
-let idToCrop = null;
-let cropper = null;
 window.assets = { template:null, templateWidth:0, templateHeight:0, font:null, aiModel:'pending' };
 
 /* ---------- Firebase Init ---------- */
@@ -173,7 +216,7 @@ try{
   db = firebase.firestore();
   window.db = db;
   loadData();
-} catch(e){ console.error('Firebase init failed', e); alert('Firebase error: '+e.message); }
+} catch(e){ console.error(e); alert('Firebase error: '+e.message); }
 
 /* ---------- Data Loading ---------- */
 function loadData(){
@@ -185,7 +228,6 @@ function loadData(){
     allStudents.sort((a,b)=> (b.submittedAt?.toMillis()||0) - (a.submittedAt?.toMillis()||0));
     window.allStudents = allStudents;
     
-    // Populate Filter
     const currentVal = schoolFilter.value;
     schoolFilter.innerHTML = '<option value="all">All Schools</option>';
     Array.from(schools).forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s; schoolFilter.appendChild(o); });
@@ -196,14 +238,11 @@ function loadData(){
 }
 
 document.getElementById('refreshBtn').addEventListener('click', loadData);
-
-/* ---------- Filtering & Rendering ---------- */
 schoolFilter.addEventListener('change', filterAndRender);
 
 function filterAndRender(){
     const val = schoolFilter.value;
     const data = (val==='all') ? allStudents : allStudents.filter(s=>s.schoolName===val);
-    
     updateHMInfo(val, data);
     renderTable(data);
 }
@@ -238,8 +277,8 @@ function renderTable(data){
       <td>${escapeHtml(s.dob||'')}</td><td>${escapeHtml(s.bloodGroup||'-')}</td><td>${escapeHtml(s.phone||'-')}</td>
       <td>${escapeHtml(s.schoolName||'')}</td>
       <td>
-        <button class="crop-btn" onclick="openCrop('${s.id}')" style="background:#6c757d; padding:5px 8px; font-size:12px;">✂ Crop</button>
-        <button class="delete-btn" onclick="confirmDelete('${s.id}','${escapeHtml(s.name)}')" style="background:#dc3545; padding:5px 8px; font-size:12px;">🗑</button>
+        <button onclick="openEdit('${s.id}')" style="background:#007bff; padding:5px 10px; font-size:12px; margin-right:5px;">✎ Edit</button>
+        <button onclick="confirmDelete('${s.id}','${escapeHtml(s.name)}')" style="background:#dc3545; padding:5px 10px; font-size:12px;">🗑</button>
       </td>`;
     tableBody.appendChild(tr);
   });
@@ -247,7 +286,6 @@ function renderTable(data){
   document.querySelectorAll('.student-select').forEach(cb => cb.addEventListener('change', updateGenerateCount));
 }
 
-/* ---------- Selection Logic ---------- */
 selectAllCheckbox.addEventListener('change', (e)=>{
     document.querySelectorAll('.student-select').forEach(cb => cb.checked = e.target.checked);
     updateGenerateCount();
@@ -266,83 +304,20 @@ function updateGenerateCount(){
     }
 }
 
-/* ---------- Delete Logic ---------- */
-window.confirmDelete = function(id, name){
-    idToDelete = id;
-    document.getElementById('confirmText').textContent = `Delete ${name}?`;
-    document.getElementById('confirmModal').style.display='flex';
-}
-document.getElementById('confirmYesBtn').onclick = () => {
-    if(idToDelete){
-        db.collection('students').doc(idToDelete.toString()).delete()
-        .then(() => {
-            allStudents = allStudents.filter(s=>s.id.toString() !== idToDelete.toString());
-            filterAndRender();
-            document.getElementById('confirmModal').style.display='none';
-        });
-    }
-}
-document.getElementById('confirmNoBtn').onclick = () => document.getElementById('confirmModal').style.display='none';
-document.getElementById('deleteAllBtn').onclick = () => document.getElementById('deleteAllModal').style.display='flex';
-document.getElementById('deleteAllNoBtn').onclick = () => document.getElementById('deleteAllModal').style.display='none';
-document.getElementById('deleteAllYesBtn').onclick = async () => {
-    // Delete all logic here if needed (simplified for brevity)
-    alert("Function disabled for safety in this version.");
-    document.getElementById('deleteAllModal').style.display='none';
-}
-
-/* ---------- Cropper Logic ---------- */
-window.openCrop = function(id){
-    idToCrop = id;
-    const s = allStudents.find(x => x.id.toString() === id.toString());
-    if(s && s.photoBase64){
-        if(cropper) cropper.destroy();
-        document.getElementById('cropImage').src = s.photoBase64;
-        document.getElementById('cropModal').style.display = 'flex';
-        cropper = new Cropper(document.getElementById('cropImage'), { aspectRatio: 187/225, viewMode:1 });
-    }
-}
-document.getElementById('cancelCropBtn').onclick = () => { document.getElementById('cropModal').style.display='none'; if(cropper) cropper.destroy(); }
-document.getElementById('saveCropBtn').onclick = () => {
-    if(!cropper || !idToCrop) return;
-    const canvas = cropper.getCroppedCanvas({ width:187, height:225 });
-    const base64 = canvas.toDataURL('image/jpeg', 0.9);
-    db.collection('students').doc(idToCrop.toString()).update({ photoBase64: base64 }).then(()=>{
-        const s = allStudents.find(x => x.id.toString() === idToCrop.toString());
-        if(s) s.photoBase64 = base64;
-        filterAndRender();
-        document.getElementById('cropModal').style.display='none';
-        cropper.destroy();
-    });
-}
-
-/* ---------- ROBUST AI LOADER (From Old Code) ---------- */
-let FaceDetector = null, FilesetResolver = null, faceDetector = null;
-async function importVision(url){ try{ return await import(url); }catch(e){ console.warn('vision import fail', url, e); throw e; } }
-async function loadVisionBundle(){
-  const candidates = [
-    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs",
-    "https://unpkg.com/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs"
-  ];
-  for(const c of candidates){ try{ const mod = await importVision(c); console.log('vision loaded from',c); return mod; } catch(e){ } }
-  throw new Error('vision bundle failed');
-}
+/* ---------- AI Engine ---------- */
+let FaceDetector=null, FilesetResolver=null, faceDetector=null;
 async function initializeFaceDetector(){
   window.assets.aiModel = 'pending'; updateStatus();
   try{
-    const mod = await loadVisionBundle();
+    const mod = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs");
     FaceDetector = mod.FaceDetector; FilesetResolver = mod.FilesetResolver;
-    const wasmCandidates = ["https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm","https://unpkg.com/@mediapipe/tasks-vision@0.10.14/wasm"];
-    let fileset = null;
-    for(const w of wasmCandidates){ try{ fileset = await FilesetResolver.forVisionTasks(w); break; }catch(e){ } }
-    if(!fileset) throw new Error('Fileset failed');
+    const fileset = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
     faceDetector = await FaceDetector.createFromOptions(fileset, { baseOptions:{ modelAssetPath:"https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite", delegate:"GPU" }, minDetectionConfidence:0.5, runningMode:"IMAGE" });
     window.assets.aiModel = 'loaded'; updateStatus(); console.log('AI Loaded');
   }catch(err){ console.warn('AI failed', err); window.assets.aiModel = 'failed'; updateStatus(); }
 }
 initializeFaceDetector();
 
-/* ---------- Status & Inputs ---------- */
 const cardCanvas = document.getElementById('cardCanvas');
 const ctx = cardCanvas.getContext('2d');
 
@@ -370,63 +345,50 @@ document.getElementById('fontInput').onchange = async e => {
     updateStatus();
 }
 
-/* ---------- GENERATION LOGIC (Merged) ---------- */
-// 1. Generate Single Card
+/* ---------- Generation Logic ---------- */
 async function generateCardImage(student){
   cardCanvas.width = CARD_W; cardCanvas.height = CARD_H;
   ctx.clearRect(0,0,CARD_W,CARD_H);
   
-  // Template
   if(window.assets.template) ctx.drawImage(window.assets.template, 0, 0, CARD_W, CARD_H);
   else { ctx.fillStyle='white'; ctx.fillRect(0,0,CARD_W,CARD_H); }
   
-  // Photo Logic (Scaled)
   const ORIG_PX = 222, ORIG_PY = 250, ORIG_PW = 187, ORIG_PH = 225;
   const tplW = window.assets.templateWidth || CARD_W;
   const scale = CARD_W / tplW;
   const px = Math.round(ORIG_PX * scale), py = Math.round(ORIG_PY * scale);
   const pw = Math.round(ORIG_PW * scale), ph = Math.round(ORIG_PH * scale);
   
-  ctx.fillStyle = '#000'; ctx.fillRect(px - 3, py - 3, pw + 6, ph + 6); // Border
+  ctx.fillStyle = '#000'; ctx.fillRect(px - 3, py - 3, pw + 6, ph + 6);
 
-  const photo = new Image();
-  photo.crossOrigin = "Anonymous";
+  const photo = new Image(); photo.crossOrigin = "Anonymous";
   if(student.photoBase64){
       photo.src = student.photoBase64;
       await new Promise(r => { photo.onload=r; photo.onerror=r; });
   }
 
   let sx=0, sy=0, sW=photo.width||1, sH=photo.height||1;
-  // AI Detect
   if(photo.width && faceDetector && window.assets.aiModel === 'loaded'){
       try {
           const det = faceDetector.detect(photo);
           if(det.detections.length>0){
               const box = det.detections[0].boundingBox;
-              const cx = box.originX + box.width/2;
-              const cy = box.originY + box.height/2;
-              const targetW = box.width * 2.0; 
-              const targetH = targetW / 0.83; // Aspect ratio
-              sx = Math.max(0, cx - targetW/2);
-              sy = Math.max(0, cy - targetH/2.2);
-              sW = Math.min(photo.width - sx, targetW);
-              sH = Math.min(photo.height - sy, targetH);
+              const cx = box.originX + box.width/2; const cy = box.originY + box.height/2;
+              const targetW = box.width * 2.0; const targetH = targetW / 0.83;
+              sx = Math.max(0, cx - targetW/2); sy = Math.max(0, cy - targetH/2.2);
+              sW = Math.min(photo.width - sx, targetW); sH = Math.min(photo.height - sy, targetH);
           }
       } catch(e){}
   } else {
-      // Fallback Center Crop
       const tr = pw/ph; const sr = sW/sH;
-      if(sr > tr) { sW = sH*tr; sx=(photo.width-sW)/2; } 
-      else { sH = sW/tr; sy=(photo.height-sH)/2; }
+      if(sr > tr) { sW = sH*tr; sx=(photo.width-sW)/2; } else { sH = sW/tr; sy=(photo.height-sH)/2; }
   }
   
   if(photo.width) ctx.drawImage(photo, sx, sy, sW, sH, px, py, pw, ph);
   
-  // Text
   ctx.fillStyle = '#000'; ctx.textBaseline = 'alphabetic';
   ctx.font = `${Math.round(38*scale)}px OdiaFont`;
   const tx = Math.round(227*scale);
-  
   let dob = student.dob || '';
   try{ const [y,m,d] = dob.split('-'); if(y&&m&&d) dob = `${d}/${m}/${y}`; } catch(e){}
   
@@ -440,11 +402,9 @@ async function generateCardImage(student){
       ctx.fillStyle = 'white'; ctx.font = `${Math.round(23*scale)}px OdiaFont`;
       ctx.fillText(student.bloodGroup, Math.round(480*scale), Math.round((360+23)*scale));
   }
-  
   return await new Promise(r => cardCanvas.toBlob(r, 'image/png'));
 }
 
-/* ---------- 2. Main Generate Handler (Selected Only) ---------- */
 generateBtn.onclick = async () => {
     const checkboxes = document.querySelectorAll('.student-select:checked');
     if(checkboxes.length === 0) return alert("Select students first");
@@ -457,29 +417,25 @@ generateBtn.onclick = async () => {
         
         const zip = new JSZip();
         const singleFolder = zip.folder('cards_png');
-        const pdfMod = await import('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
-        const jsPDF = pdfMod.jsPDF;
+        
+        const { jsPDF } = window.jspdf;
         const pdf = new jsPDF({ unit:'px', format:[CARD_W, CARD_H] });
         
         let counter = 0;
-        let singleImages = []; // For A4 layout
+        let singleImages = [];
         
         for(const st of dataToGen){
             counter++; generatorStatus.textContent = `Generating ${counter}/${dataToGen.length}...`;
             const blob = await generateCardImage(st);
             const fname = `${(st.name||'st').replace(/\s/g,'_')}_${st.roll}.png`;
-            
-            // Add to Zip
             const buf = await blob.arrayBuffer();
             singleFolder.file(fname, buf);
             
-            // Add to PDF
             const img = new Image(); img.src = URL.createObjectURL(blob);
             await new Promise(r => img.onload=r);
             if(counter > 1) pdf.addPage([CARD_W, CARD_H], 'portrait');
             pdf.addImage(img, 'PNG', 0, 0, CARD_W, CARD_H);
             
-            // Add Watermark to PDF
             pdf.saveGraphicsState();
             pdf.setGState(new pdf.GState({opacity: 0.1}));
             pdf.setFontSize(20); pdf.setTextColor(0,0,0);
@@ -490,21 +446,19 @@ generateBtn.onclick = async () => {
             singleImages.push({blob: blob, img: img});
         }
         
-        generatorStatus.textContent = "Creating Combined PDF...";
+        generatorStatus.textContent = "Combined PDF...";
         zip.file('All_ID_Cards.pdf', pdf.output('arraybuffer'));
         
-        generatorStatus.textContent = "Creating A4 Sheets...";
-        // A4 Layout Logic
+        generatorStatus.textContent = "A4 Sheets...";
         const pageCanvas = document.createElement('canvas'); pageCanvas.width=A4_W; pageCanvas.height=A4_H;
         const pctx = pageCanvas.getContext('2d');
-        const cellW = Math.floor(A4_W/5), cellH = Math.floor(A4_H/2); // 5x2 landscape grid
+        const cellW = Math.floor(A4_W/5), cellH = Math.floor(A4_H/2);
         
         for(let i=0; i<singleImages.length; i+=10){
             pctx.fillStyle='white'; pctx.fillRect(0,0,A4_W,A4_H);
             const chunk = singleImages.slice(i, i+10);
             chunk.forEach((item, idx) => {
                 const col = idx % 5; const row = Math.floor(idx / 5);
-                // Center in cell
                 const x = col*cellW + (cellW-item.img.width)/2;
                 const y = row*cellH + (cellH-item.img.height)/2;
                 pctx.drawImage(item.img, x, y);
@@ -516,7 +470,7 @@ generateBtn.onclick = async () => {
         generatorStatus.textContent = "Zipping...";
         const content = await zip.generateAsync({type:'blob'});
         const link = document.createElement('a'); link.href = URL.createObjectURL(content);
-        link.download = `Cards_Batch_${Date.now()}.zip`; link.click();
+        link.download = `Cards_${Date.now()}.zip`; link.click();
         
         generatorStatus.textContent = "Done! Ready.";
         
@@ -524,17 +478,96 @@ generateBtn.onclick = async () => {
     generateBtn.disabled = false;
 }
 
-/* ---------- 3. Backup ZIP ---------- */
+/* ---------- Backup Logic ---------- */
 document.getElementById('downloadZipBtn').onclick = async () => {
-    // Same as old code, simplified
     alert("Starting backup...");
     const val = schoolFilter.value;
     const data = (val==='all') ? allStudents : allStudents.filter(s=>s.schoolName===val);
     const zip = new JSZip();
     data.forEach(s => { if(s.photoBase64) zip.file(`photos/${s.newPhotoName}`, s.photoBase64.split(',')[1], {base64:true}); });
-    // Excel part omitted for brevity but logic is same as before
+    const excelData = data.map(s => {
+        let dob = s.dob||''; try{ const [y,m,d] = dob.split('-'); if(y&&m&&d) dob = `${d}/${m}/${y}`; } catch(e){}
+        return { 
+            name: s.name, class: s.class, dob: toOdiaDigits(dob), 
+            roll: toOdiaDigits(s.roll), phone: toOdiaDigits(s.phone), 
+            school: s.schoolName, hmPhone: s.hmPhone, photo: s.newPhotoName 
+        };
+    });
+    const ws = XLSX.utils.json_to_sheet(excelData); const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Students");
+    zip.file('database.xlsx', XLSX.write(wb, {type:'array', bookType:'xlsx'}));
+    
     const blob = await zip.generateAsync({type:'blob'});
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download='Backup.zip'; a.click();
+}
+
+/* ---------- EDIT & DELETE HANDLERS (New) ---------- */
+window.confirmDelete = function(id, name){
+    idToDelete = id; document.getElementById('confirmText').textContent = `Delete ${name}?`;
+    document.getElementById('confirmModal').style.display='flex';
+}
+document.getElementById('confirmYesBtn').onclick = () => {
+    if(idToDelete){ db.collection('students').doc(idToDelete.toString()).delete().then(()=>{ allStudents=allStudents.filter(s=>s.id.toString()!==idToDelete.toString()); filterAndRender(); document.getElementById('confirmModal').style.display='none'; }); }
+}
+document.getElementById('confirmNoBtn').onclick = () => document.getElementById('confirmModal').style.display='none';
+document.getElementById('deleteAllBtn').onclick = () => document.getElementById('deleteAllModal').style.display='flex';
+document.getElementById('deleteAllNoBtn').onclick = () => document.getElementById('deleteAllModal').style.display='none';
+document.getElementById('deleteAllYesBtn').onclick = async () => { alert("Disabled for safety"); document.getElementById('deleteAllModal').style.display='none'; }
+
+// EDIT LOGIC
+window.openEdit = function(id) {
+    const s = allStudents.find(x => x.id.toString() === id.toString());
+    if(!s) return alert("Student not found");
+
+    document.getElementById('editId').value = s.id;
+    document.getElementById('editName').value = s.name || '';
+    document.getElementById('editClass').value = s.class || '';
+    document.getElementById('editRoll').value = s.roll || '';
+    document.getElementById('editDob').value = s.dob || '';
+    document.getElementById('editBlood').value = s.bloodGroup || '';
+    document.getElementById('editPhone').value = s.phone || '';
+
+    document.getElementById('editModal').style.display = 'flex';
+}
+
+document.getElementById('cancelEditBtn').onclick = () => {
+    document.getElementById('editModal').style.display = 'none';
+}
+
+document.getElementById('saveEditBtn').onclick = async () => {
+    const id = document.getElementById('editId').value;
+    const btn = document.getElementById('saveEditBtn');
+    
+    btn.textContent = "Saving...";
+    btn.disabled = true;
+
+    const updatedData = {
+        name: document.getElementById('editName').value,
+        class: document.getElementById('editClass').value,
+        roll: document.getElementById('editRoll').value,
+        dob: document.getElementById('editDob').value,
+        bloodGroup: document.getElementById('editBlood').value,
+        phone: document.getElementById('editPhone').value
+    };
+
+    try {
+        await db.collection('students').doc(id).update(updatedData);
+        
+        // Update local array immediately
+        const idx = allStudents.findIndex(x => x.id.toString() === id.toString());
+        if(idx !== -1) {
+            allStudents[idx] = { ...allStudents[idx], ...updatedData };
+        }
+        
+        filterAndRender();
+        document.getElementById('editModal').style.display = 'none';
+        
+    } catch(e) {
+        alert("Error saving: " + e.message);
+    } finally {
+        btn.textContent = "Save Changes";
+        btn.disabled = false;
+    }
 }
 </script>
 </body>
