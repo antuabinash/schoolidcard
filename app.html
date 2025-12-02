@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Entry</title>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
+    
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f4f7f6; margin: 0; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; }
+        
+        /* Cards */
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        
+        /* Inputs */
+        input, select { width: 100%; padding: 12px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        label { font-weight: 600; font-size: 14px; color: #555; display: block; margin-bottom: 5px; }
+        
+        /* Buttons */
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; color: white; margin-bottom: 5px; }
+        .btn-primary { background: #0056b3; }
+        .btn-success { background: #28a745; }
+        .btn-danger { background: #dc3545; }
+        .btn-outline { background: transparent; border: 1px solid #0056b3; color: #0056b3; }
+        
+        /* School Grid */
+        .school-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
+        .school-item { background: white; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #eee; position: relative; cursor: pointer; }
+        .school-item:hover { border-color: #0056b3; background: #f0f8ff; }
+        .school-del { position: absolute; top: 5px; right: 5px; background: #ffebeb; color: red; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+
+        /* Student List Item */
+        .student-item { display: flex; align-items: center; background: white; padding: 10px; border-radius: 8px; margin-bottom: 8px; border: 1px solid #eee; }
+        .student-img { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; margin-right: 15px; background: #eee; }
+        .student-info { flex: 1; }
+        .student-actions { display: flex; gap: 5px; }
+        .action-icon { padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 14px; }
+        .edit-icon { background: #e3f2fd; color: #0056b3; }
+        .del-icon { background: #ffebeb; color: #dc3545; }
+
+        /* Camera Modal */
+        #cameraModal { display: none; position: fixed; inset: 0; background: black; z-index: 100; flex-direction: column; }
+        #cameraVideo { flex: 1; width: 100%; object-fit: cover; }
+        .cam-controls { padding: 20px; display: flex; justify-content: space-between; align-items: center; background: black; }
+        .shutter { width: 60px; height: 60px; border-radius: 50%; background: white; border: 4px solid #ccc; cursor: pointer; }
+
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        
+        <div id="schoolSection">
+            <h2 style="text-align:center; color:#0056b3;">Select School</h2>
+            <div class="card">
+                <input type="text" id="newSchoolName" placeholder="Enter School Name">
+                <button class="btn btn-primary" id="addSchoolBtn">Add School</button>
+            </div>
+            <div id="schoolListDisplay" class="school-list"></div>
+        </div>
+
+        <div id="entrySection" class="hidden">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h3 id="currentSchoolHeader" style="margin:0;">School Name</h3>
+                <button class="btn btn-outline" onclick="exitSchool()" style="width:auto; padding: 5px 15px; font-size:12px;">Change School</button>
+            </div>
+
+            <div class="card">
+                <h4 id="formTitle" style="margin-top:0;">Add Student</h4>
+                <input type="hidden" id="editId">
+                
+                <input type="text" id="sName" placeholder="Full Name (e.g. ଅବିନାଶ)">
+                
+                <div style="display:flex; gap:10px;">
+                    <select id="sClass">
+                        <option value="">Class</option>
+                        <option value="Nursery">Nursery</option>
+                        <option value="1">Class 1</option><option value="2">Class 2</option>
+                        <option value="3">Class 3</option><option value="4">Class 4</option>
+                        <option value="5">Class 5</option><option value="6">Class 6</option>
+                        <option value="7">Class 7</option><option value="8">Class 8</option>
+                        <option value="9">Class 9</option><option value="10">Class 10</option>
+                    </select>
+                    <input type="text" id="sRoll" placeholder="Roll No">
+                </div>
+                
+                <div style="display:flex; gap:10px;">
+                    <input type="date" id="sDob">
+                    <select id="sBlood">
+                        <option value="">Blood Group</option>
+                        <option value="A+">A+</option><option value="B+">B+</option>
+                        <option value="O+">O+</option><option value="AB+">AB+</option>
+                    </select>
+                </div>
+
+                <div style="margin-top:10px; text-align:center;">
+                    <button class="btn btn-primary" id="openCam" style="margin-bottom:5px;">📷 Take Photo</button>
+                    <input type="file" id="fileInput" accept="image/*" class="hidden">
+                    <button class="btn btn-outline" onclick="document.getElementById('fileInput').click()">📁 Gallery</button>
+                    <br>
+                    <img id="preview" src="" style="width:80px; height:80px; object-fit:cover; display:none; margin:10px auto; border-radius:8px; border:2px solid #ddd;">
+                </div>
+
+                <button class="btn btn-success" id="saveBtn" style="margin-top:15px;">Save Student</button>
+                <button class="btn btn-danger hidden" id="cancelEdit">Cancel Edit</button>
+            </div>
+
+            <h3>Student List</h3>
+            <div id="studentList"></div>
+        </div>
+
+    </div>
+
+    <div id="cameraModal">
+        <video id="cameraVideo" autoplay playsinline></video>
+        <canvas id="canvas" class="hidden"></canvas>
+        <div class="cam-controls">
+            <button onclick="closeCam()" style="background:none; border:none; color:white;">Cancel</button>
+            <div class="shutter" id="snap"></div>
+            <button style="background:none; border:none; color:white;">flip</button>
+        </div>
+    </div>
+
+    <script>
+        // CONFIG
+        const firebaseConfig = {
+              apiKey: "AIzaSyC76wT0RbwuLGbhp0mU7kje25g-xxydLqU",
+              authDomain: "idcard-60586.firebaseapp.com",
+              projectId: "idcard-60586",
+              storageBucket: "idcard-60586.firebasestorage.app",
+              messagingSenderId: "331979663377",
+              appId: "1:331979663377:web:026e537a7fcaca813129b0",
+              measurementId: "G-PXVV87C78S"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const firestore = firebase.firestore();
+
+        let db, currentSchool = null, students = [], currentPhotoBlob = null;
+        
+        // DB INIT
+        const req = indexedDB.open('SchoolDataApp', 2);
+        req.onupgradeneeded = e => {
+            db = e.target.result;
+            if(!db.objectStoreNames.contains('schools')) db.createObjectStore('schools', {keyPath:'name'});
+            if(!db.objectStoreNames.contains('students')) {
+                const st = db.createObjectStore('students', {keyPath:'id'});
+                st.createIndex('schoolName', 'schoolName', {unique:false});
+            }
+        };
+        req.onsuccess = e => { db = e.target.result; loadSchools(); };
+
+        // --- SCHOOL LOGIC ---
+        function loadSchools() {
+            const tx = db.transaction(['schools'], 'readonly');
+            tx.objectStore('schools').getAll().onsuccess = e => {
+                const div = document.getElementById('schoolListDisplay');
+                div.innerHTML = '';
+                e.target.result.forEach(s => {
+                    const el = document.createElement('div');
+                    el.className = 'school-item';
+                    el.innerHTML = `<span>🏫 ${s.name}</span><div class="school-del" onclick="delSchool(event, '${s.name}')">×</div>`;
+                    el.onclick = (ev) => { if(ev.target.className !== 'school-del') enterSchool(s.name); };
+                    div.appendChild(el);
+                });
+            };
+        }
+
+        document.getElementById('addSchoolBtn').onclick = () => {
+            const name = document.getElementById('newSchoolName').value.trim();
+            if(!name) return;
+            const tx = db.transaction(['schools'], 'readwrite');
+            tx.objectStore('schools').put({name});
+            tx.oncomplete = () => { document.getElementById('newSchoolName').value=''; loadSchools(); };
+        };
+
+        function delSchool(e, name) {
+            e.stopPropagation();
+            if(confirm('Delete school and all local data?')) {
+                db.transaction(['schools'], 'readwrite').objectStore('schools').delete(name);
+                // Also delete students locally
+                const tx = db.transaction(['students'], 'readwrite');
+                const idx = tx.objectStore('students').index('schoolName');
+                idx.getAll(name).onsuccess = res => {
+                    res.target.result.forEach(s => tx.objectStore('students').delete(s.id));
+                };
+                loadSchools();
+            }
+        }
+
+        function enterSchool(name) {
+            currentSchool = name;
+            document.getElementById('schoolSection').classList.add('hidden');
+            document.getElementById('entrySection').classList.remove('hidden');
+            document.getElementById('currentSchoolHeader').textContent = name;
+            loadStudents();
+        }
+
+        function exitSchool() {
+            currentSchool = null;
+            document.getElementById('schoolSection').classList.remove('hidden');
+            document.getElementById('entrySection').classList.add('hidden');
+            resetForm();
+        }
+
+        // --- STUDENT LOGIC ---
+        function loadStudents() {
+            const tx = db.transaction(['students'], 'readonly');
+            tx.objectStore('students').index('schoolName').getAll(currentSchool).onsuccess = e => {
+                students = e.target.result.sort((a,b) => b.id - a.id); // Newest first
+                renderList();
+            };
+        }
+
+        function renderList() {
+            const list = document.getElementById('studentList');
+            list.innerHTML = '';
+            students.forEach(s => {
+                const div = document.createElement('div');
+                div.className = 'student-item';
+                div.innerHTML = `
+                    <img src="${s.photoBase64 || ''}" class="student-img">
+                    <div class="student-info">
+                        <strong>${s.name}</strong><br>
+                        <small>Class: ${s.class} | Roll: ${s.roll}</small>
+                        <div style="font-size:10px; color:${s.synced?'green':'orange'}">${s.synced?'Synced':'Pending'}</div>
+                    </div>
+                    <div class="student-actions">
+                        <div class="action-icon edit-icon" onclick="editStudent(${s.id})">✎</div>
+                        <div class="action-icon del-icon" onclick="deleteStudent(${s.id})">🗑</div>
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        // --- SAVE / EDIT ---
+        document.getElementById('saveBtn').onclick = async () => {
+            const id = document.getElementById('editId').value;
+            const name = document.getElementById('sName').value;
+            const cls = document.getElementById('sClass').value;
+            const roll = document.getElementById('sRoll').value;
+            const dob = document.getElementById('sDob').value;
+            const blood = document.getElementById('sBlood').value;
+
+            if(!name || !cls || !roll) return alert('Please fill Name, Class, Roll');
+            
+            let base64 = null;
+            if(currentPhotoBlob) {
+                base64 = await blobToBase64(currentPhotoBlob);
+            } else if(id) {
+                // Editing, keep old photo
+                const old = students.find(x => x.id == id);
+                base64 = old.photoBase64;
+            } else {
+                return alert('Photo is required');
+            }
+
+            const student = {
+                id: id ? Number(id) : Date.now(),
+                schoolName: currentSchool,
+                name, class: cls, roll, dob, bloodGroup: blood,
+                photoBase64: base64,
+                photoName: `${Date.now()}.jpg`,
+                synced: false
+            };
+
+            const tx = db.transaction(['students'], 'readwrite');
+            tx.objectStore('students').put(student);
+            tx.oncomplete = () => {
+                resetForm();
+                loadStudents();
+                syncToFirebase(student);
+            };
+        };
+
+        function editStudent(id) {
+            const s = students.find(x => x.id === id);
+            if(!s) return;
+            document.getElementById('editId').value = s.id;
+            document.getElementById('sName').value = s.name;
+            document.getElementById('sClass').value = s.class;
+            document.getElementById('sRoll').value = s.roll;
+            document.getElementById('sDob').value = s.dob;
+            document.getElementById('sBlood').value = s.bloodGroup;
+            
+            document.getElementById('preview').src = s.photoBase64;
+            document.getElementById('preview').style.display = 'block';
+            
+            document.getElementById('formTitle').textContent = "Edit Student";
+            document.getElementById('saveBtn').textContent = "Update Student";
+            document.getElementById('cancelEdit').classList.remove('hidden');
+            window.scrollTo(0,0);
+        }
+
+        document.getElementById('cancelEdit').onclick = resetForm;
+
+        function resetForm() {
+            document.getElementById('editId').value = '';
+            document.getElementById('sName').value = '';
+            document.getElementById('sClass').value = '';
+            document.getElementById('sRoll').value = '';
+            document.getElementById('sDob').value = '';
+            document.getElementById('sBlood').value = '';
+            document.getElementById('preview').style.display = 'none';
+            currentPhotoBlob = null;
+            
+            document.getElementById('formTitle').textContent = "Add Student";
+            document.getElementById('saveBtn').textContent = "Save Student";
+            document.getElementById('cancelEdit').classList.add('hidden');
+        }
+
+        function deleteStudent(id) {
+            if(!confirm("Delete this student?")) return;
+            const tx = db.transaction(['students'], 'readwrite');
+            tx.objectStore('students').delete(id);
+            tx.oncomplete = () => {
+                firestore.collection('students').doc(String(id)).delete().catch(e=>console.log(e));
+                loadStudents();
+            };
+        }
+
+        // --- CAMERA & FILE ---
+        const blobToBase64 = blob => new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(blob);
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+        });
+
+        document.getElementById('openCam').onclick = async () => {
+            document.getElementById('cameraModal').style.display = 'flex';
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+            document.getElementById('cameraVideo').srcObject = stream;
+        };
+
+        document.getElementById('snap').onclick = () => {
+            const vid = document.getElementById('cameraVideo');
+            const can = document.getElementById('canvas');
+            can.width = vid.videoWidth; can.height = vid.videoHeight;
+            can.getContext('2d').drawImage(vid, 0, 0);
+            can.toBlob(blob => {
+                currentPhotoBlob = blob;
+                document.getElementById('preview').src = URL.createObjectURL(blob);
+                document.getElementById('preview').style.display = 'block';
+                closeCam();
+            }, 'image/jpeg', 0.8);
+        };
+
+        function closeCam() {
+            const s = document.getElementById('cameraVideo').srcObject;
+            if(s) s.getTracks().forEach(t=>t.stop());
+            document.getElementById('cameraModal').style.display = 'none';
+        }
+
+        document.getElementById('fileInput').onchange = e => {
+            if(e.target.files[0]) {
+                currentPhotoBlob = e.target.files[0];
+                document.getElementById('preview').src = URL.createObjectURL(currentPhotoBlob);
+                document.getElementById('preview').style.display = 'block';
+            }
+        };
+
+        // --- BACKGROUND SYNC ---
+        function syncToFirebase(student) {
+            firestore.collection('students').doc(String(student.id)).set(student)
+            .then(() => {
+                const tx = db.transaction(['students'], 'readwrite');
+                const store = tx.objectStore('students');
+                student.synced = true;
+                store.put(student);
+                tx.oncomplete = loadStudents;
+            })
+            .catch(err => console.log("Sync failed, will retry later"));
+        }
+    </script>
+</body>
+</html>
