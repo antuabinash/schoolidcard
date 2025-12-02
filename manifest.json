@@ -1,0 +1,22 @@
+{
+  "name": "Student ID Pro",
+  "short_name": "ID Pro",
+  "description": "Complete Student Data & ID Card System",
+  "start_url": "index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4f7f6",
+  "theme_color": "#0056b3",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ]
+}
