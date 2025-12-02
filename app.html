@@ -47,6 +47,7 @@
         .shutter { width: 60px; height: 60px; border-radius: 50%; background: white; border: 4px solid #ccc; cursor: pointer; }
 
         .hidden { display: none; }
+        .preview-thumb { width: 100px; height: 60px; object-fit: contain; border: 1px dashed #ccc; display: none; margin-bottom: 10px; }
     </style>
 </head>
 <body>
@@ -56,7 +57,14 @@
         <div id="schoolSection">
             <h2 style="text-align:center; color:#0056b3;">Select School</h2>
             <div class="card">
+                <label>School Details</label>
                 <input type="text" id="newSchoolName" placeholder="Enter School Name">
+                <input type="tel" id="hmPhone" placeholder="HM Phone Number">
+                
+                <label>HM Signature (Photo)</label>
+                <input type="file" id="hmSignInput" accept="image/*">
+                <img id="signPreview" class="preview-thumb">
+
                 <button class="btn btn-primary" id="addSchoolBtn">Add School</button>
             </div>
             <div id="schoolListDisplay" class="school-list"></div>
@@ -64,7 +72,10 @@
 
         <div id="entrySection" class="hidden">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                <h3 id="currentSchoolHeader" style="margin:0;">School Name</h3>
+                <div>
+                    <h3 id="currentSchoolHeader" style="margin:0;">School Name</h3>
+                    <small id="currentSchoolDetails" style="color:#666;"></small>
+                </div>
                 <button class="btn btn-outline" onclick="exitSchool()" style="width:auto; padding: 5px 15px; font-size:12px;">Change School</button>
             </div>
 
@@ -138,10 +149,10 @@
         firebase.initializeApp(firebaseConfig);
         const firestore = firebase.firestore();
 
-        let db, currentSchool = null, students = [], currentPhotoBlob = null;
+        let db, currentSchool = null, currentSchoolData = null, students = [], currentPhotoBlob = null;
         
         // DB INIT
-        const req = indexedDB.open('SchoolDataApp', 2);
+        const req = indexedDB.open('SchoolDataApp', 3); // Bumped version to 3 for new schema
         req.onupgradeneeded = e => {
             db = e.target.result;
             if(!db.objectStoreNames.contains('schools')) db.createObjectStore('schools', {keyPath:'name'});
@@ -152,7 +163,25 @@
         };
         req.onsuccess = e => { db = e.target.result; loadSchools(); };
 
+        // --- HELPER: Blob to Base64 ---
+        const blobToBase64 = blob => new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(blob);
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+        });
+
         // --- SCHOOL LOGIC ---
+        
+        // Preview HM Signature
+        document.getElementById('hmSignInput').onchange = (e) => {
+            const file = e.target.files[0];
+            if(file) {
+                document.getElementById('signPreview').src = URL.createObjectURL(file);
+                document.getElementById('signPreview').style.display = 'block';
+            }
+        };
+
         function loadSchools() {
             const tx = db.transaction(['schools'], 'readonly');
             tx.objectStore('schools').getAll().onsuccess = e => {
@@ -161,26 +190,50 @@
                 e.target.result.forEach(s => {
                     const el = document.createElement('div');
                     el.className = 'school-item';
-                    el.innerHTML = `<span>🏫 ${s.name}</span><div class="school-del" onclick="delSchool(event, '${s.name}')">×</div>`;
-                    el.onclick = (ev) => { if(ev.target.className !== 'school-del') enterSchool(s.name); };
+                    el.innerHTML = `<span>🏫 ${s.name}</span><br><small>${s.hmPhone || ''}</small><div class="school-del" onclick="delSchool(event, '${s.name}')">×</div>`;
+                    el.onclick = (ev) => { if(ev.target.className !== 'school-del') enterSchool(s); };
                     div.appendChild(el);
                 });
             };
         }
 
-        document.getElementById('addSchoolBtn').onclick = () => {
+        document.getElementById('addSchoolBtn').onclick = async () => {
             const name = document.getElementById('newSchoolName').value.trim();
-            if(!name) return;
+            const hmPhone = document.getElementById('hmPhone').value.trim();
+            const signFile = document.getElementById('hmSignInput').files[0];
+
+            if(!name) return alert("Enter School Name");
+            
+            document.getElementById('addSchoolBtn').textContent = "Saving...";
+            
+            let signBase64 = null;
+            if(signFile) {
+                signBase64 = await blobToBase64(signFile);
+            }
+
+            const schoolObj = {
+                name: name,
+                hmPhone: hmPhone,
+                hmSignature: signBase64,
+                createdAt: Date.now()
+            };
+
             const tx = db.transaction(['schools'], 'readwrite');
-            tx.objectStore('schools').put({name});
-            tx.oncomplete = () => { document.getElementById('newSchoolName').value=''; loadSchools(); };
+            tx.objectStore('schools').put(schoolObj);
+            tx.oncomplete = () => { 
+                document.getElementById('newSchoolName').value=''; 
+                document.getElementById('hmPhone').value='';
+                document.getElementById('hmSignInput').value='';
+                document.getElementById('signPreview').style.display='none';
+                document.getElementById('addSchoolBtn').textContent = "Add School";
+                loadSchools(); 
+            };
         };
 
         function delSchool(e, name) {
             e.stopPropagation();
             if(confirm('Delete school and all local data?')) {
                 db.transaction(['schools'], 'readwrite').objectStore('schools').delete(name);
-                // Also delete students locally
                 const tx = db.transaction(['students'], 'readwrite');
                 const idx = tx.objectStore('students').index('schoolName');
                 idx.getAll(name).onsuccess = res => {
@@ -190,16 +243,22 @@
             }
         }
 
-        function enterSchool(name) {
-            currentSchool = name;
+        function enterSchool(schoolObj) {
+            currentSchool = schoolObj.name;
+            currentSchoolData = schoolObj; // Store full school data (with sign/phone)
+            
             document.getElementById('schoolSection').classList.add('hidden');
             document.getElementById('entrySection').classList.remove('hidden');
-            document.getElementById('currentSchoolHeader').textContent = name;
+            
+            document.getElementById('currentSchoolHeader').textContent = schoolObj.name;
+            document.getElementById('currentSchoolDetails').textContent = `Phone: ${schoolObj.hmPhone || 'N/A'}`;
+            
             loadStudents();
         }
 
         function exitSchool() {
             currentSchool = null;
+            currentSchoolData = null;
             document.getElementById('schoolSection').classList.remove('hidden');
             document.getElementById('entrySection').classList.add('hidden');
             resetForm();
@@ -209,7 +268,7 @@
         function loadStudents() {
             const tx = db.transaction(['students'], 'readonly');
             tx.objectStore('students').index('schoolName').getAll(currentSchool).onsuccess = e => {
-                students = e.target.result.sort((a,b) => b.id - a.id); // Newest first
+                students = e.target.result.sort((a,b) => b.id - a.id);
                 renderList();
             };
         }
@@ -251,7 +310,6 @@
             if(currentPhotoBlob) {
                 base64 = await blobToBase64(currentPhotoBlob);
             } else if(id) {
-                // Editing, keep old photo
                 const old = students.find(x => x.id == id);
                 base64 = old.photoBase64;
             } else {
@@ -261,10 +319,15 @@
             const student = {
                 id: id ? Number(id) : Date.now(),
                 schoolName: currentSchool,
+                // Embed School Metadata for Admin Panel
+                hmPhone: currentSchoolData.hmPhone || '',
+                hmSignature: currentSchoolData.hmSignature || '',
+                
                 name, class: cls, roll, dob, bloodGroup: blood,
                 photoBase64: base64,
                 photoName: `${Date.now()}.jpg`,
-                synced: false
+                synced: false,
+                submittedAt: firebase.firestore.FieldValue.serverTimestamp()
             };
 
             const tx = db.transaction(['students'], 'readwrite');
@@ -323,13 +386,6 @@
         }
 
         // --- CAMERA & FILE ---
-        const blobToBase64 = blob => new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(blob);
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = reject;
-        });
-
         document.getElementById('openCam').onclick = async () => {
             document.getElementById('cameraModal').style.display = 'flex';
             const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
