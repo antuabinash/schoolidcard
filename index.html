@@ -13,85 +13,160 @@
             justify-content: center;
             align-items: center;
             height: 100vh;
-            background: #f4f7f6;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
             margin: 0;
             text-align: center;
         }
+        
+        .card {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            max-width: 90%;
+            width: 350px;
+            transition: transform 0.3s ease;
+        }
+
+        .icon-box {
+            width: 80px;
+            height: 80px;
+            background: #0056b3;
+            border-radius: 15px;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 40px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,86,179,0.3);
+        }
+
+        h2 { margin: 0 0 10px 0; color: #333; }
+        p { color: #666; font-size: 14px; margin-bottom: 30px; line-height: 1.5; }
+
+        .btn {
+            width: 100%;
+            padding: 15px;
+            font-size: 16px;
+            font-weight: bold;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: none; /* Hidden by default until logic decides */
+        }
+
+        .btn-install { background-color: #28a745; color: white; box-shadow: 0 4px 10px rgba(40,167,69,0.3); }
+        .btn-install:active { transform: scale(0.98); }
+
+        .btn-open { background-color: #0056b3; color: white; box-shadow: 0 4px 10px rgba(0,86,179,0.3); }
+        .btn-open:active { transform: scale(0.98); }
+
         .loader {
-            border: 5px solid #f3f3f3;
-            border-top: 5px solid #0056b3;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #0056b3;
             border-radius: 50%;
-            width: 50px;
-            height: 50px;
+            width: 20px;
+            height: 20px;
             animation: spin 1s linear infinite;
-            margin-bottom: 20px;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 10px;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        button {
-            background-color: #28a745;
-            color: white;
-            padding: 15px 30px;
-            font-size: 18px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            display: none; /* Hidden by default */
-        }
-        h2 { color: #333; margin-top: 0; }
-        p { color: #666; max-width: 300px; line-height: 1.5; }
+
+        /* Status Text */
+        #statusText { margin-top: 15px; font-size: 12px; color: #888; display: none; }
     </style>
 </head>
 <body>
 
-    <div id="loadingUI">
-        <div class="loader"></div>
-        <h2>Checking App Status...</h2>
-    </div>
-
-    <div id="installUI" style="display:none;">
-        <img src="icon-192.png" style="width: 80px; border-radius: 15px; margin-bottom: 20px;">
-        <h2>Install App</h2>
-        <p>Please install the app to manage student data offline.</p>
-        <button id="installBtn">📲 Install Now</button>
+    <div class="card">
+        <div class="icon-box">ID</div>
+        <h2>Student Data</h2>
+        <p>Manage student records offline. Install the app for the best experience.</p>
+        
+        <button id="installBtn" class="btn btn-install">📲 Install App</button>
+        <button id="openBtn" class="btn btn-open">🚀 Open App</button>
+        
+        <div id="statusText"></div>
     </div>
 
     <script>
-        // 1. Check if running as Installed App (Standalone)
-        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+        const installBtn = document.getElementById('installBtn');
+        const openBtn = document.getElementById('openBtn');
+        const statusText = document.getElementById('statusText');
+        let deferredPrompt;
 
-        if (isStandalone) {
-            // Already installed -> Go straight to App
+        // 1. AUTO-REDIRECT CHECK
+        // If the app is already open in "Standalone" (App Mode), go straight to entry page.
+        if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
             window.location.replace("app.html");
         } else {
-            // Browser mode -> Show Install UI
-            document.getElementById('loadingUI').style.display = 'none';
-            document.getElementById('installUI').style.display = 'block';
+            // We are in a browser tab.
+            // Default assumption: App might be installed, so show "Open App".
+            // If the browser fires 'beforeinstallprompt', we know it's NOT installed, so we swap buttons.
+            openBtn.style.display = 'block';
         }
 
-        // 2. Handle Installation
-        let deferredPrompt;
-        const installBtn = document.getElementById('installBtn');
-
+        // 2. DETECT IF INSTALLABLE
         window.addEventListener('beforeinstallprompt', (e) => {
+            // Prevent Chrome 67 and earlier from automatically showing the prompt
             e.preventDefault();
+            // Stash the event so it can be triggered later.
             deferredPrompt = e;
+            
+            // It IS installable, so show the Install button instead of Open
+            openBtn.style.display = 'none';
             installBtn.style.display = 'block';
         });
 
+        // 3. HANDLE INSTALL CLICK
         installBtn.addEventListener('click', async () => {
-            if (deferredPrompt) {
-                deferredPrompt.prompt();
-                const { outcome } = await deferredPrompt.userChoice;
-                if (outcome === 'accepted') {
-                    // If they accepted, we can redirect or wait for them to open from home screen
-                    console.log('User installed');
-                }
-                deferredPrompt = null;
+            if (!deferredPrompt) return;
+
+            // UX: Show feedback
+            installBtn.innerHTML = '<div class="loader"></div> Installing...';
+            
+            // Show the native prompt
+            deferredPrompt.prompt();
+            
+            // Wait for the user to respond to the prompt
+            const { outcome } = await deferredPrompt.userChoice;
+            
+            if (outcome === 'accepted') {
+                console.log('User accepted the install prompt');
+                // The 'appinstalled' event will fire next
+            } else {
+                console.log('User dismissed the install prompt');
+                installBtn.textContent = "📲 Install App"; // Reset text
             }
+            deferredPrompt = null;
         });
 
+        // 4. LISTEN FOR SUCCESSFUL INSTALL
+        window.addEventListener('appinstalled', () => {
+            // Hide install, show open
+            installBtn.style.display = 'none';
+            openBtn.style.display = 'block';
+            
+            statusText.style.display = 'block';
+            statusText.textContent = "✅ App Installed Successfully!";
+            
+            // Optional: Auto-redirect after 1 second
+            setTimeout(() => {
+                window.location.href = 'app.html';
+            }, 1500);
+        });
+
+        // 5. HANDLE OPEN CLICK
+        openBtn.addEventListener('click', () => {
+            window.location.href = 'app.html';
+        });
+
+        // 6. REGISTER SERVICE WORKER
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js');
         }
