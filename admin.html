@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Student Data</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
+    
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 20px; background: #f4f7f6; }
+        h1, h2 { color: #0056b3; }
+        
+        .card {
+            max-width: 1200px; /* Made wider for new columns */
+            margin: 0 auto 20px auto;
+            padding: 20px;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+
+        /* Controls */
+        .controls { margin-bottom: 20px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: space-between; }
+        select, button, input[type="file"] { padding: 10px; font-size: 14px; border-radius: 4px; border: 1px solid #ccc; }
+        button { background: #28a745; color: white; border: none; cursor: pointer; font-weight: 600; }
+        button:disabled { background: #999; cursor: not-allowed; }
+        button:hover:not(:disabled) { opacity: 0.9; }
+        
+        #downloadZipBtn { background: #ffc107; color: #333; }
+        #refreshBtn { background: #17a2b8; color: white; }
+
+        /* Table Styling */
+        table { width: 100%; border-collapse: collapse; background: white; margin-top: 20px; font-size: 14px; }
+        th, td { padding: 8px 10px; border: 1px solid #eee; text-align: left; vertical-align: middle; }
+        th { background: #0056b3; color: white; position: sticky; top: 0; }
+        tr:hover { background-color: #f9f9f9; }
+        
+        img.student-thumb { width: 40px; height: 40px; object-fit: cover; border-radius: 4px; border: 1px solid #ddd; }
+        
+        /* Action Buttons */
+        .delete-btn { background-color: #dc3545; color: white; padding: 5px 10px; font-size: 12px; border-radius: 4px; }
+        .crop-btn { background-color: #6c757d; color: white; padding: 5px 10px; font-size: 12px; border-radius: 4px; margin-right: 5px; }
+
+        /* Generator Section */
+        #generatorStatus { font-style: italic; color: #555; margin-top: 10px; }
+        .generator-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; align-items: end; }
+        #generateBtn { background-color: #007bff; height: 42px; font-size: 15px; } 
+
+        /* Checkbox styling */
+        .checkbox-col { width: 30px; text-align: center; }
+        .sn-col { width: 40px; text-align: center; font-weight: bold; color: #666; }
+        input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+
+        /* Modals */
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); align-items: center; justify-content: center; }
+        .modal-content { background-color: #fff; padding: 20px; border-radius: 8px; text-align: center; max-width: 90vw; width: 500px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .modal-buttons { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+        .modal-buttons button { width: 100px; }
+
+        #cropImageContainer { width: 100%; max-height: 60vh; overflow: hidden; }
+        #cropImageContainer img { max-width: 100%; }
+    </style>
+</head>
+<body>
+    <h1>Admin Panel: Student Data</h1>
+    
+    <div class="card">
+        <h2>🖨️ ID Card Generator</h2>
+        <div class="generator-grid">
+            <div>
+                <label style="display:block; margin-bottom:5px; font-weight:bold;">1. Upload Template (.png)</label>
+                <input type="file" id="templateInput" accept="image/png" style="width:95%;">
+            </div>
+            <div>
+                <label style="display:block; margin-bottom:5px; font-weight:bold;">2. Upload Odia Font (.ttf)</label>
+                <input type="file" id="fontInput" accept=".ttf,.otf,font/ttf,font/otf" style="width:95%;">
+            </div>
+            <div>
+                <button id="generateBtn" disabled style="width:100%;">Select Students First</button>
+            </div>
+        </div>
+        <p id="generatorStatus">Status: ❌ Template, ❌ Font, ⏳ AI Model...</p>
+    </div>
+
+    <div class="card">
+        <div class="controls">
+            <div>
+                <label><strong>Filter School:</strong></label>
+                <select id="schoolFilter">
+                    <option value="all">All Schools</option>
+                </select>
+            </div>
+            <div>
+                <button id="refreshBtn">🔄 Refresh Data</button>
+                <button id="downloadZipBtn">💾 Backup All (ZIP)</button>
+            </div>
+        </div>
+
+        <table id="studentTable">
+            <thead>
+                <tr>
+                    <th class="checkbox-col"><input type="checkbox" id="selectAll"></th>
+                    <th class="sn-col">S.N.</th>
+                    <th>Photo</th>
+                    <th>Name</th>
+                    <th>Class</th>
+                    <th>Roll</th>
+                    <th>DOB</th>
+                    <th>Blood</th>
+                    <th>Phone</th>
+                    <th>School</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td colspan="11" style="text-align:center;">Loading data...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <canvas id="cardCanvas" style="display: none;"></canvas>
+
+    <div id="confirmModal" class="modal">
+        <div class="modal-content">
+            <h3>Confirm Deletion</h3>
+            <p id="confirmText">Are you sure?</p>
+            <div class="modal-buttons">
+                <button id="confirmYesBtn" style="background:#dc3545">Yes</button>
+                <button id="confirmNoBtn" style="background:#6c757d">No</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="cropModal" class="modal">
+        <div class="modal-content">
+            <h3>Crop Photo</h3>
+            <div id="cropImageContainer">
+                <img id="cropImage" src="">
+            </div>
+            <div class="modal-buttons">
+                <button id="saveCropBtn" style="background:#28a745">Save</button>
+                <button id="cancelCropBtn" style="background:#6c757d">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allStudents = [];
+        const tableBody = document.querySelector('#studentTable tbody');
+        const schoolFilter = document.getElementById('schoolFilter');
+        const selectAllCheckbox = document.getElementById('selectAll');
+        
+        // Modal Elements
+        const confirmModal = document.getElementById('confirmModal');
+        const cropModal = document.getElementById('cropModal');
+        let cropper = null;
+        let idToCrop = null;
+        let idToDelete = null; 
+        
+        // Globals for Module
+        window.allStudents = [];
+        window.db = null;
+        window.odiaDigits = ['୦', '୧', '୨', '୩', '୪', '୫', '୬', '୭', '୮', '୯'];
+        
+        // --- FIREBASE INIT ---
+        try {
+            const firebaseConfig = {
+              apiKey: "AIzaSyC76wT0RbwuLGbhp0mU7kje25g-xxydLqU",
+              authDomain: "idcard-60586.firebaseapp.com",
+              projectId: "idcard-60586",
+              storageBucket: "idcard-60586.firebasestorage.app",
+              messagingSenderId: "331979663377",
+              appId: "1:331979663377:web:026e537a7fcaca813129b0",
+              measurementId: "G-PXVV87C78S"
+            };
+            firebase.initializeApp(firebaseConfig);
+            window.db = firebase.firestore();
+            
+            loadData();
+            document.getElementById('refreshBtn').addEventListener('click', loadData);
+
+        } catch (e) { alert("Firebase Error: " + e.message); }
+        
+        function loadData() {
+            tableBody.innerHTML = '<tr><td colspan="11" style="text-align:center;">Loading...</td></tr>';
+            
+            window.db.collection("students").get().then((querySnapshot) => {
+                allStudents = [];
+                const schools = new Set();
+                
+                querySnapshot.forEach((doc) => {
+                    const s = doc.data();
+                    allStudents.push(s);
+                    if(s.schoolName) schools.add(s.schoolName);
+                });
+                
+                // Sort by Timestamp (Newest first)
+                allStudents.sort((a, b) => (b.submittedAt?.toMillis() || 0) - (a.submittedAt?.toMillis() || 0));
+                window.allStudents = allStudents;
+
+                // Populate School Filter
+                const currentFilter = schoolFilter.value;
+                schoolFilter.innerHTML = '<option value="all">All Schools</option>';
+                schools.forEach(school => {
+                    const opt = document.createElement('option');
+                    opt.value = school;
+                    opt.textContent = school;
+                    schoolFilter.appendChild(opt);
+                });
+                schoolFilter.value = currentFilter;
+                
+                filterAndRender();
+            });
+        }
+
+        schoolFilter.addEventListener('change', filterAndRender);
+
+        function filterAndRender() {
+            const val = schoolFilter.value;
+            const data = (val === 'all') ? allStudents : allStudents.filter(s => s.schoolName === val);
+            renderTable(data);
+        }
+
+        function renderTable(data) {
+            tableBody.innerHTML = '';
+            selectAllCheckbox.checked = false; // Reset select all
+            updateGenerateBtnCount();
+
+            if (data.length === 0) {
+                 tableBody.innerHTML = '<tr><td colspan="11" style="text-align:center;">No students found.</td></tr>';
+                 return;
+            }
+
+            data.forEach((s, index) => {
+                const photoSrc = s.photoBase64 || 'https://placehold.co/50?text=None';
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="checkbox-col"><input type="checkbox" class="student-select" value="${s.id}"></td>
+                    <td class="sn-col">${index + 1}</td>
+                    <td><img src="${photoSrc}" class="student-thumb" onclick="window.open('${photoSrc}')" style="cursor:pointer"></td>
+                    <td><strong>${s.name}</strong></td>
+                    <td>${s.class}</td>
+                    <td>${s.roll}</td>
+                    <td>${s.dob || ''}</td>
+                    <td>${s.bloodGroup || ''}</td>
+                    <td>${s.phone || ''}</td>
+                    <td>${s.schoolName}</td>
+                    <td>
+                        <button class="crop-btn" data-id="${s.id}">✂ Crop</button>
+                        <button class="delete-btn" data-id="${s.id}" data-name="${s.name}">🗑</button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+
+            // Re-attach event listeners for checkboxes
+            document.querySelectorAll('.student-select').forEach(cb => {
+                cb.addEventListener('change', updateGenerateBtnCount);
+            });
+        }
+
+        // --- SELECTION LOGIC ---
+        selectAllCheckbox.addEventListener('change', (e) => {
+            const checkboxes = document.querySelectorAll('.student-select');
+            checkboxes.forEach(cb => cb.checked = e.target.checked);
+            updateGenerateBtnCount();
+        });
+
+        function updateGenerateBtnCount() {
+            const count = document.querySelectorAll('.student-select:checked').length;
+            const btn = document.getElementById('generateBtn');
+            const status = document.getElementById('generatorStatus').textContent;
+            
+            // Only enable if resources are loaded (checked via button text usually, but here just UI)
+            if(count > 0) {
+                btn.innerHTML = `Generate <strong>${count}</strong> Selected Cards`;
+            } else {
+                btn.innerHTML = `Select Students First`;
+            }
+        }
+
+        // --- DELETE LOGIC ---
+        tableBody.addEventListener('click', (e) => {
+            if (e.target.classList.contains('delete-btn')) {
+                idToDelete = e.target.dataset.id;
+                document.getElementById('confirmText').textContent = `Delete ${e.target.dataset.name}?`;
+                confirmModal.style.display = 'flex';
+            }
+            if (e.target.classList.contains('crop-btn')) {
+                idToCrop = e.target.dataset.id;
+                const student = allStudents.find(s => s.id.toString() === idToCrop);
+                if (student && student.photoBase64) openCropper(student.photoBase64);
+            }
+        });
+
+        document.getElementById('confirmYesBtn').onclick = () => {
+            if (idToDelete) {
+                window.db.collection("students").doc(idToDelete.toString()).delete()
+                .then(() => {
+                    // Update local array immediately
+                    allStudents = allStudents.filter(s => s.id.toString() !== idToDelete.toString());
+                    window.allStudents = allStudents;
+                    filterAndRender();
+                    confirmModal.style.display = 'none';
+                });
+            }
+        };
+        document.getElementById('confirmNoBtn').onclick = () => confirmModal.style.display = 'none';
+
+        // --- CROPPER LOGIC ---
+        function openCropper(base64Image) {
+            if (cropper) cropper.destroy();
+            document.getElementById('cropImage').src = base64Image;
+            cropModal.style.display = 'flex';
+            cropper = new Cropper(document.getElementById('cropImage'), { 
+                aspectRatio: 187 / 225, 
+                viewMode: 1, 
+                autoCropArea: 0.9 
+            });
+        }
+        document.getElementById('cancelCropBtn').onclick = () => { cropModal.style.display = 'none'; if(cropper) cropper.destroy(); };
+        document.getElementById('saveCropBtn').onclick = () => {
+            if (!cropper || !idToCrop) return;
+            const btn = document.getElementById('saveCropBtn');
+            btn.textContent = "Saving...";
+            
+            const canvas = cropper.getCroppedCanvas({ width: 187, height: 225 });
+            const newBase64 = canvas.toDataURL('image/jpeg', 0.9);
+            
+            window.db.collection("students").doc(idToCrop).update({ photoBase64: newBase64 }).then(() => {
+                const s = allStudents.find(x => x.id.toString() === idToCrop);
+                if(s) s.photoBase64 = newBase64;
+                filterAndRender();
+                cropModal.style.display = 'none';
+                cropper.destroy();
+                btn.textContent = "Save";
+            });
+        };
+
+        // --- BACKUP ZIP ---
+        document.getElementById('downloadZipBtn').onclick = async () => {
+            if(allStudents.length === 0) return alert("No data");
+            const btn = document.getElementById('downloadZipBtn');
+            btn.disabled = true; btn.textContent = "Zipping...";
+            
+            try {
+                const zip = new JSZip();
+                allStudents.forEach(s => {
+                    if(s.photoBase64) zip.file(s.newPhotoName, s.photoBase64.split(',')[1], {base64: true});
+                });
+                
+                const excelData = allStudents.map((s, i) => ({
+                    SN: i+1, Name: s.name, Class: s.class, Roll: s.roll, DOB: s.dob, 
+                    School: s.schoolName, PhotoFile: s.newPhotoName
+                }));
+                const ws = XLSX.utils.json_to_sheet(excelData);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Students");
+                zip.file('database.xlsx', XLSX.write(wb, {type:'array', bookType:'xlsx'}));
+
+                const blob = await zip.generateAsync({type:'blob'});
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = `Full_Backup_${new Date().toISOString().slice(0,10)}.zip`;
+                a.click();
+            } catch(e) { console.error(e); } 
+            btn.disabled = false; btn.textContent = "💾 Backup All (ZIP)";
+        };
+    </script>
+    
+    <script type="module">
+        import { FaceDetector, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.js";
+        
+        const assets = { template: null, font: null, aiReady: false };
+        let faceDetector;
+        const generateBtn = document.getElementById('generateBtn');
+        const statusMsg = document.getElementById('generatorStatus');
+        const canvas = document.getElementById('cardCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // 1. Initialize AI
+        async function initAI() {
+            try {
+                const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+                faceDetector = await FaceDetector.createFromOptions(vision, {
+                    baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite", delegate: "GPU" },
+                    runningMode: "IMAGE"
+                });
+                assets.aiReady = true;
+                checkReady();
+            } catch(e) { 
+                statusMsg.textContent += " ⚠️ AI Failed (Will use center crop)";
+                assets.aiReady = true; // Allow proceed without AI
+                checkReady();
+            }
+        }
+        initAI();
+
+        // 2. Handle Inputs
+        document.getElementById('templateInput').onchange = (e) => {
+            if(e.target.files[0]) {
+                const img = new Image();
+                img.src = URL.createObjectURL(e.target.files[0]);
+                img.onload = () => { assets.template = img; canvas.width=img.width; canvas.height=img.height; checkReady(); };
+            }
+        };
+
+        document.getElementById('fontInput').onchange = async (e) => {
+            if(e.target.files[0]) {
+                const fontData = await e.target.files[0].arrayBuffer();
+                const font = new FontFace('OdiaFont', fontData);
+                await font.load();
+                document.fonts.add(font);
+                assets.font = true;
+                checkReady();
+            }
+        };
+
+        function checkReady() {
+            const t = assets.template ? '✅' : '❌';
+            const f = assets.font ? '✅' : '❌';
+            const a = assets.aiReady ? '✅' : '⏳';
+            statusMsg.textContent = `Template: ${t} | Font: ${f} | AI: ${a}`;
+            
+            // Enable logic inside click handler, visual logic handled by selection
+        }
+
+        function toOdia(str) {
+            if(!str) return "";
+            return str.toString().replace(/[0-9]/g, d => window.odiaDigits[d]);
+        }
+
+        // 3. GENERATE LOGIC
+        generateBtn.addEventListener('click', async () => {
+            if(!assets.template || !assets.font) return alert("Upload Template & Font first!");
+            
+            const checkboxes = document.querySelectorAll('.student-select:checked');
+            if(checkboxes.length === 0) return alert("Please select at least one student from the table.");
+
+            const selectedIds = Array.from(checkboxes).map(cb => cb.value);
+            const targets = window.allStudents.filter(s => selectedIds.includes(s.id.toString()));
+
+            generateBtn.disabled = true;
+            generateBtn.textContent = `Processing ${targets.length} cards...`;
+
+            const zip = new JSZip();
+
+            for(const student of targets) {
+                try {
+                    const blob = await createCard(student);
+                    const safeName = (student.name || 'Student').replace(/[^a-z0-9]/gi, '_');
+                    zip.file(`${safeName}_${student.roll}.png`, blob);
+                } catch(e) { console.error(e); }
+            }
+
+            const content = await zip.generateAsync({type:'blob'});
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(content);
+            a.download = `ID_Cards_Selected_${targets.length}.zip`;
+            a.click();
+
+            generateBtn.disabled = false;
+            generateBtn.textContent = "Done! Select More";
+        });
+
+        async function createCard(student) {
+            return new Promise(resolve => {
+                ctx.clearRect(0,0,canvas.width,canvas.height);
+                ctx.drawImage(assets.template, 0, 0);
+
+                // --- TEXT DRAWING ---
+                ctx.fillStyle = "black";
+                ctx.textBaseline = "alphabetic";
+                ctx.font = "38px OdiaFont"; 
+                // Adjust positions based on your template coordinates
+                ctx.fillText(student.name || "", 227, 543);
+                ctx.fillText(student.class || "", 227, 613);
+                
+                let dobOdia = "";
+                if(student.dob) {
+                    try { const [y,m,d] = student.dob.split('-'); dobOdia = `${d}/${m}/${y}`; } catch(e){}
+                }
+                ctx.fillText(toOdia(dobOdia), 227, 685);
+                ctx.fillText(toOdia(student.roll), 227, 756);
+                ctx.fillText(toOdia(student.phone), 227, 827);
+
+                if(student.bloodGroup) {
+                    ctx.fillStyle = "white"; 
+                    ctx.font = "23px OdiaFont";
+                    ctx.fillText(student.bloodGroup, 480, 383);
+                }
+
+                // --- PHOTO DRAWING (With AI) ---
+                const photo = new Image();
+                photo.crossOrigin = "Anonymous";
+                photo.src = student.photoBase64;
+                photo.onload = () => {
+                    const px=222, py=250, pw=187, ph=225, border=3;
+                    
+                    // Draw Black Border
+                    ctx.fillStyle = "black";
+                    ctx.fillRect(px-border, py-border, pw+border*2, ph+border*2);
+
+                    let sx=0, sy=0, sw=photo.width, sh=photo.height;
+
+                    // AI Detection
+                    if(assets.aiReady && faceDetector) {
+                        try {
+                            const result = faceDetector.detect(photo);
+                            if(result.detections.length > 0) {
+                                const box = result.detections[0].boundingBox;
+                                // Expand box for passport style
+                                const cx = box.originX + box.width/2;
+                                const cy = box.originY + box.height/2;
+                                
+                                // ID card ratio is roughly 0.83 (187/225)
+                                // We want the face to be about 60% of width
+                                const targetW = box.width * 2.0; 
+                                const targetH = targetW / 0.83;
+
+                                sx = Math.max(0, cx - targetW/2);
+                                sy = Math.max(0, cy - targetH/2.2); // Move up slightly
+                                sw = Math.min(photo.width - sx, targetW);
+                                sh = Math.min(photo.height - sy, targetH);
+                            } else {
+                                // Fallback: Center Crop
+                                const aspect = pw/ph;
+                                if(sw/sh > aspect) { sw = sh*aspect; sx=(photo.width-sw)/2; }
+                                else { sh = sw/aspect; sy=(photo.height-sh)/2; }
+                            }
+                        } catch(e) { /* fallback */ }
+                    }
+                    
+                    ctx.drawImage(photo, sx, sy, sw, sh, px, py, pw, ph);
+                    canvas.toBlob(resolve, 'image/png');
+                };
+                photo.onerror = () => resolve(null); // Resolve even if error to continue loop
+            });
+        }
+    </script>
+</body>
+</html>
