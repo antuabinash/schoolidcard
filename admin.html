@@ -283,10 +283,11 @@ function renderTable(){
     document.getElementById('selectAll').checked = false;
     currentSchoolStudents.forEach((s, i) => {
         const tr = document.createElement('tr');
+        // IMPORTANT: Use quotes '${s.id}' to pass as string
         tr.innerHTML = `<td><input type="checkbox" class="sel" value="${s.id}"></td><td>${i+1}</td>
         <td><img class="thumb" src="${s.photoBase64 || ''}"></td>
         <td>${s.name}</td><td>${s.class}</td><td>${s.roll}</td><td>${s.dob}</td><td>${s.bloodGroup||''}</td><td>${s.mobile||''}</td>
-        <td><button class="btn btn-primary" onclick="edit('${s.id}')">✎</button> <button class="btn btn-danger" onclick="del('${s.id}')">🗑</button></td>`;
+        <td><button class="btn btn-primary" onclick="openEditModal('${s.id}')">✎</button> <button class="btn btn-danger" onclick="del('${s.id}')">🗑</button></td>`;
         tbody.appendChild(tr);
     });
     document.querySelectorAll('.sel').forEach(c => c.onchange = updateSelection);
@@ -302,7 +303,8 @@ function updateSelection(){
     document.getElementById('selectionCount').textContent = `${n} selected`;
     const btn = document.getElementById('generateBtn');
     
-    if(n > 0 && window.assets.font && window.assets.template && window.assets.aiModel !== 'pending') {
+    // AI is now optional ('pending' won't block it, only check if template and font exist)
+    if(n > 0 && window.assets.font && window.assets.template) {
         btn.disabled = false;
         btn.innerHTML = `🖨 Generate <b>${n}</b> Cards`;
     } else {
@@ -344,7 +346,11 @@ let faceDetector=null;
         faceDetector = await vision.FaceDetector.createFromOptions(fileset, { baseOptions:{ modelAssetPath:"https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite", delegate:"GPU" }, minDetectionConfidence:0.5 });
         window.assets.aiModel = 'loaded'; document.getElementById('aiStatus').textContent = "✅ AI Ready";
         updateSelection();
-    } catch(e) { window.assets.aiModel = 'failed'; document.getElementById('aiStatus').textContent = "⚠️ AI Failed"; }
+    } catch(e) { 
+        window.assets.aiModel = 'failed'; 
+        document.getElementById('aiStatus').textContent = "⚠️ AI Failed (Using simple crop)";
+        updateSelection(); // Enable button anyway
+    }
 })();
 
 /* ---------- DRAWING ENGINE ---------- */
@@ -355,53 +361,46 @@ async function drawCard(s) {
     canvas.width = CARD_W; canvas.height = CARD_H;
     ctx.clearRect(0,0,CARD_W,CARD_H);
 
-    // 1. Draw Background PNG
+    // 1. Background (Guaranteed)
     ctx.drawImage(window.assets.template, 0, 0, CARD_W, CARD_H);
 
-    // 2. School Name & Address (Dynamic Placement - Centered Top)
+    // 2. School Name & Address (WHITE text on top header)
     ctx.fillStyle = '#FFFFFF'; 
     ctx.textAlign = 'center'; 
     ctx.font = 'bold 45px OdiaFont';
     ctx.fillText(s.schoolName, (CARD_W/2) + 60, 75); // Offset for Logo space
     
-    // Address Line
     const sm = schoolsMap[s.schoolName];
     ctx.font = '30px OdiaFont';
     ctx.fillText(`${sm.block}, ${sm.district} - ${toOdiaDigits(sm.pin)}`, (CARD_W/2) + 60, 125);
 
-    // 3. Photo & Black Box (ORIGINAL LOGIC - RESTORED)
-    // Scale calculation based on template width (standard logic)
+    // 3. Photo & Box (ORIGINAL LOGIC)
     const tplW = window.assets.template.width || CARD_W;
     const scale = CARD_W / tplW;
     
-    // Coordinates from your original manual code
     const ORIG_PX = 222, ORIG_PY = 250, ORIG_PW = 187, ORIG_PH = 225;
-    
     const px = Math.round(ORIG_PX * scale), py = Math.round(ORIG_PY * scale);
     const pw = Math.round(ORIG_PW * scale), ph = Math.round(ORIG_PH * scale);
     const border = Math.max(2, Math.round(3 * scale));
 
-    // Black BG for photo border
     ctx.fillStyle = '#000'; ctx.fillRect(px - border, py - border, pw + border*2, ph + border*2);
 
-    // Photo Drawing
     if(s.photoBase64) {
         const photo = new Image(); photo.src = s.photoBase64;
         await new Promise(r => photo.onload=r);
         let sx=0, sy=0, sw=photo.width, sh=photo.height;
         
-        // AI Crop Logic
+        // AI Crop if available
         if(window.assets.aiModel === 'loaded' && faceDetector) {
             try {
                 const det = faceDetector.detect(photo);
                 if(det.detections.length > 0) {
                     const box = det.detections[0].boundingBox;
-                    const add_w = parseInt(box.width * 0.6); 
-                    const add_h = parseInt(box.height * 1.4); 
-                    sx = Math.max(0, box.originX - add_w/2);
-                    sy = Math.max(0, box.originY - add_h/2);
-                    sw = Math.min(photo.width - sx, box.width + add_w);
-                    sh = Math.min(photo.height - sy, box.height + add_h);
+                    const padX = box.width * 0.5; const padY = box.height * 0.8;
+                    sx = Math.max(0, box.originX - padX);
+                    sy = Math.max(0, box.originY - padY);
+                    sw = Math.min(photo.width - sx, box.width + (padX*2));
+                    sh = Math.min(photo.height - sy, box.height + (padY*2));
                 }
             } catch(e){}
         }
@@ -409,7 +408,7 @@ async function drawCard(s) {
     }
 
     // 4. Student Text (ORIGINAL LOGIC - RESTORED)
-    // Only filling values, assuming labels exist on background
+    // Only filling values, assuming labels exist on background from previous version
     ctx.fillStyle = '#000'; ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
     ctx.font = `${Math.round(38*scale)}px OdiaFont`;
     const tx = Math.round(227*scale);
@@ -417,6 +416,7 @@ async function drawCard(s) {
     let dob = s.dob || '';
     try{ const [y,m,d] = dob.split('-'); if(y&&m&&d) dob = `${d}/${m}/${y}`; } catch(e){}
     
+    // Coordinates derived from original logic (505, 575, 647...)
     ctx.fillText(s.name||'', tx, Math.round((505+38)*scale));
     ctx.fillText(s.class||'', tx, Math.round((575+38)*scale));
     ctx.fillText(toOdiaDigits(dob), tx, Math.round((647+38)*scale));
@@ -424,21 +424,18 @@ async function drawCard(s) {
     const phNum = s.mobile || s.phone || '';
     ctx.fillText(toOdiaDigits(phNum), tx, Math.round((789+38)*scale));
     
-    // Blood Group
     if(s.bloodGroup){
         ctx.fillStyle = 'white'; ctx.font = `${Math.round(23*scale)}px OdiaFont`;
         ctx.fillText(s.bloodGroup, Math.round(480*scale), Math.round((360+23)*scale));
     }
 
-    // 5. HM Signature (Bottom Right - NEW)
+    // 5. HM Signature (Bottom Right)
     if(sm && sm.signature) {
         const sign = new Image(); sign.src = sm.signature;
         await new Promise(r => sign.onload=r);
-        // Resize logic: Max W 200, Max H 80
         const ratio = Math.min(200/sign.width, 80/sign.height);
         const sw = sign.width * ratio;
         const sh = sign.height * ratio;
-        // Position: Bottom Right corner area
         ctx.drawImage(sign, CARD_W - sw - 30, CARD_H - 150, sw, sh);
     }
 
@@ -456,9 +453,7 @@ document.getElementById('generateBtn').onclick = async () => {
     const folder = zip.folder("PNGs");
     const { jsPDF } = window.jspdf;
     
-    // PDF 1: Verification Proof (Watermarked)
     const verifyPdf = new jsPDF({ unit:'px', format:[CARD_W, CARD_H] });
-    // PDF 2: Print Ready
     const printPdf = new jsPDF({ unit:'px', format:[CARD_W, CARD_H] });
 
     const imgs = [];
@@ -473,15 +468,14 @@ document.getElementById('generateBtn').onclick = async () => {
         await new Promise(r => imgObj.onload=r);
         imgs.push(imgObj);
 
-        // Add to Print PDF
+        // Print PDF
         if(i>0) printPdf.addPage([CARD_W, CARD_H], 'portrait');
         printPdf.addImage(imgObj, 'PNG', 0, 0, CARD_W, CARD_H);
 
-        // Add to Verify PDF (Watermarked)
+        // Verify PDF
         if(i>0) verifyPdf.addPage([CARD_W, CARD_H], 'portrait');
         verifyPdf.addImage(imgObj, 'PNG', 0, 0, CARD_W, CARD_H);
         
-        // Draw Repeated Text Watermark (30% opacity)
         verifyPdf.saveGraphicsState();
         verifyPdf.setGState(new verifyPdf.GState({opacity: 0.3}));
         verifyPdf.setTextColor(255, 0, 0); 
@@ -525,23 +519,27 @@ document.getElementById('generateBtn').onclick = async () => {
     btn.disabled = false; updateSelection();
 };
 
-/* ---------- EDIT/DEL ---------- */
-function edit(id){
+/* ---------- EDIT/DEL (FIXED) ---------- */
+function openEditModal(id){
+    // Loose equality to catch string vs number issues
     const s = currentSchoolStudents.find(x => x.id == id);
-    if(!s) return;
+    if(!s) { console.error('Student not found:', id); return; }
+    
     document.getElementById('editId').value = s.id;
     document.getElementById('editName').value = s.name;
     document.getElementById('editClass').value = s.class;
     document.getElementById('editRoll').value = s.roll;
     document.getElementById('editDob').value = s.dob;
     document.getElementById('editBlood').value = s.bloodGroup;
-    document.getElementById('editPhone').value = s.mobile || '';
+    document.getElementById('editPhone').value = s.mobile || s.phone || '';
     document.getElementById('editModal').style.display = 'flex';
 }
+
 function del(id){
     if(!confirm('Delete?')) return;
     db.collection('students').doc(id.toString()).delete().then(loadData);
 }
+
 document.getElementById('saveEditBtn').onclick = async () => {
     const id = document.getElementById('editId').value;
     const data = {
@@ -552,11 +550,13 @@ document.getElementById('saveEditBtn').onclick = async () => {
         bloodGroup: document.getElementById('editBlood').value,
         mobile: document.getElementById('editPhone').value
     };
-    await db.collection('students').doc(id.toString()).update(data);
-    const s = currentSchoolStudents.find(x => x.id == id);
-    Object.assign(s, data);
-    document.getElementById('editModal').style.display='none';
-    renderTable();
+    try {
+        await db.collection('students').doc(id.toString()).update(data);
+        const s = currentSchoolStudents.find(x => x.id == id);
+        if(s) Object.assign(s, data);
+        document.getElementById('editModal').style.display='none';
+        renderTable();
+    } catch(e) { alert("Error: "+e.message); }
 };
 </script>
 </body>
