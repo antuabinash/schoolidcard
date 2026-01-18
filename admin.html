@@ -23,12 +23,13 @@
     .btn-danger { background:#dc3545; }
     .btn-warning { background:#ffc107; color:#222; }
     .btn-secondary { background:#6c757d; }
-    input, select { padding:10px; border-radius:6px; border:1px solid #ccc; }
+    input, select { padding:10px; border-radius:6px; border:1px solid #ccc; box-sizing: border-box; }
 
     /* Layouts */
-    .school-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; }
-    .school-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); cursor: pointer; border: 1px solid #eee; }
+    .school-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+    .school-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); cursor: pointer; border: 1px solid #eee; transition:0.2s; }
     .school-card:hover { transform: translateY(-3px); border-color: #007bff; }
+    .school-meta { font-size: 13px; color: #666; margin-bottom: 4px; }
     
     .detail-header { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: start; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
     .hm-sign-img { height: 50px; border: 1px solid #ddd; margin-top: 5px; background: white; padding: 2px; }
@@ -45,14 +46,14 @@
     th { background:#f8f9fa; font-weight: 600; }
     img.thumb { width:35px; height:35px; border-radius:4px; object-fit: cover; border: 1px solid #ddd; }
 
-    .action-bar { margin-top: 20px; padding: 20px; background: white; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; position: sticky; bottom: 0; box-shadow: 0 -4px 10px rgba(0,0,0,0.05); }
+    .action-bar { margin-top: 20px; padding: 20px; background: white; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; position: sticky; bottom: 0; box-shadow: 0 -4px 10px rgba(0,0,0,0.05); z-index: 100; }
 
     /* Modals */
     .modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:2000; align-items:center; justify-content:center; }
-    .modal-content { background:white; padding:25px; border-radius:8px; width:90%; max-width:400px; }
-    .form-group { margin-bottom: 15px; }
+    .modal-content { background:white; padding:25px; border-radius:8px; width:90%; max-width:400px; max-height: 90vh; overflow-y: auto; }
+    .form-group { margin-bottom: 12px; }
     .form-group label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; }
-    .form-group input, .form-group select { width: 100%; box-sizing: border-box; }
+    .form-group input, .form-group select { width: 100%; }
     .modal-btns { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
   </style>
 </head>
@@ -64,8 +65,8 @@
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
         <h1>Admin Dashboard</h1>
         <div>
-            <button class="btn btn-primary" onclick="loadData()">🔄 Refresh Data</button>
-            <button class="btn btn-warning" id="downloadRawBtn">💾 Backup Data</button>
+            <button class="btn btn-primary" onclick="loadData()">🔄 Refresh</button>
+            <button class="btn btn-warning" id="downloadRawBtn">💾 Backup</button>
         </div>
     </div>
     <div id="schoolGrid" class="school-grid"><p>Loading...</p></div>
@@ -127,46 +128,49 @@
     <div class="modal-content">
         <h3>Edit Student</h3>
         <input type="hidden" id="editId">
+        
         <div class="form-group"><label>Name</label><input type="text" id="editName"></div>
         <div style="display:flex; gap:10px;">
-            <div class="form-group"><label>Class</label><input type="text" id="editClass"></div>
-            <div class="form-group"><label>Roll</label><input type="text" id="editRoll"></div>
+            <div class="form-group" style="flex:1"><label>Class</label><input type="text" id="editClass"></div>
+            <div class="form-group" style="flex:1"><label>Roll</label><input type="text" id="editRoll"></div>
         </div>
         <div style="display:flex; gap:10px;">
-            <div class="form-group"><label>DOB</label><input type="date" id="editDob"></div>
-            <div class="form-group"><label>Blood</label><select id="editBlood"><option value="">-</option><option value="A+">A+</option><option value="B+">B+</option><option value="O+">O+</option><option value="AB+">AB+</option></select></div>
+            <div class="form-group" style="flex:1"><label>DOB</label><input type="date" id="editDob"></div>
+            <div class="form-group" style="flex:1"><label>Blood</label>
+                <select id="editBlood">
+                    <option value="">-</option><option value="A+">A+</option><option value="B+">B+</option>
+                    <option value="O+">O+</option><option value="AB+">AB+</option>
+                </select>
+            </div>
         </div>
         <div class="form-group"><label>Mobile</label><input type="text" id="editPhone"></div>
+        
+        <hr style="border:0; border-top:1px solid #eee; margin: 15px 0;">
+        <label style="font-size:12px; color:#E85C0D; font-weight:bold;">School Details (Fix if missing)</label>
+        <div style="display:flex; gap:10px;">
+            <div class="form-group" style="flex:1"><label>Block</label><input type="text" id="editBlock"></div>
+            <div class="form-group" style="flex:1"><label>District</label><input type="text" id="editDistrict"></div>
+        </div>
+        <div class="form-group"><label>Pin Code</label><input type="text" id="editPin"></div>
+
         <div class="modal-btns">
             <button class="btn btn-secondary" onclick="document.getElementById('editModal').style.display='none'">Cancel</button>
-            <button class="btn btn-primary" id="saveEditBtn">Save</button>
+            <button class="btn btn-primary" id="saveEditBtn">Save Changes</button>
         </div>
     </div>
 </div>
 
 <script>
-/* ---------- CONFIG ---------- */
+/* ---------- CONFIGURATION ---------- */
 const DPI = 300;
-const CARD_W = 638;  // 54mm @ 300dpi
-const CARD_H = 1012; // 85.6mm @ 300dpi
+const CARD_W = 638;  // 54mm
+const CARD_H = 1012; // 85.6mm
 const A4_W = 3508, A4_H = 2480;
 
-// Coordinate Configuration
-// School Name Area: 119 to 611 px. Center = 365px.
-const HEADER_MIN_X = 119;
-const HEADER_MAX_X = 611;
-const HEADER_CENTER_X = 365;
-const HEADER_Y = 57;
-
-// Address Area: 198, 94
-const ADDR_X = 198;
-const ADDR_Y = 94;
-
-// Signature: 434, 881
-const SIGN_X = 434;
-const SIGN_Y = 881;
-const SIGN_MAX_W = 180;
-const SIGN_MAX_H = 60;
+// === COORDINATES (AS REQUESTED) ===
+const SCHOOL_NAME_POS = { x: 121, y: 55, maxX: 611 }; 
+const ADDR_POS = { x: 198, y: 94 };
+const SIGN_POS = { x: 434, y: 881, maxW: 180, maxH: 60 };
 
 /* ---------- HELPERS ---------- */
 window.odiaDigits = ['୦','୧','୨','୩','୪','୫','୬','୭','୮','୯'];
@@ -180,7 +184,7 @@ let schoolsMap = {};
 let currentSchoolStudents = [];
 window.assets = { template: null, font: null, aiModel: 'pending', mode: 'manual' }; 
 
-/* ---------- AUTO-LOAD ASSETS ---------- */
+/* ---------- ASSET LOADER ---------- */
 async function loadAutoAssets() {
     try {
         const resp = await fetch('OdiaFont.ttf');
@@ -202,7 +206,7 @@ async function loadAutoAssets() {
             img.src = URL.createObjectURL(blob);
             img.onload = () => {
                 window.assets.template = img;
-                window.assets.mode = 'auto';
+                window.assets.mode = 'auto'; // Auto Mode
                 document.getElementById('tplStatus').className = 'status-badge status-ok';
                 document.getElementById('tplStatus').textContent = 'Auto-Loaded';
                 updateSelection();
@@ -212,7 +216,7 @@ async function loadAutoAssets() {
     updateSelection();
 }
 
-/* ---------- FIREBASE ---------- */
+/* ---------- FIREBASE INIT ---------- */
 try{
   const firebaseConfig = {
       apiKey: "AIzaSyC76wT0RbwuLGbhp0mU7kje25g-xxydLqU",
@@ -242,15 +246,20 @@ function loadData(){
                 if(!schoolsMap[d.schoolName]) {
                     schoolsMap[d.schoolName] = {
                         name: d.schoolName, count: 0,
+                        // Fix for missing data: check current record
                         block: d.block || '', district: d.district || '',
                         pin: d.pin || '', phone: d.hmPhone || d.mobile || '',
                         signature: d.hmSignature || ''
                     };
                 }
                 schoolsMap[d.schoolName].count++;
+                
+                // If map data is empty, try to fill from current student
                 const sm = schoolsMap[d.schoolName];
                 if(!sm.signature && d.hmSignature) sm.signature = d.hmSignature;
                 if(!sm.block && d.block) sm.block = d.block;
+                if(!sm.district && d.district) sm.district = d.district;
+                if(!sm.pin && d.pin) sm.pin = d.pin;
             }
         });
         renderDashboard();
@@ -262,12 +271,23 @@ function renderDashboard(){
     grid.innerHTML = '';
     const names = Object.keys(schoolsMap).sort();
     if(names.length === 0){ grid.innerHTML = '<p>No schools found.</p>'; return; }
+    
     names.forEach(name => {
         const s = schoolsMap[name];
         const div = document.createElement('div');
         div.className = 'school-card';
         div.onclick = () => openSchoolDetail(name);
-        div.innerHTML = `<h3>${escapeHtml(s.name)}</h3><div class="school-meta">📍 ${escapeHtml(s.district)}</div><div class="school-meta">👥 ${s.count} Students</div>`;
+        
+        // DISPLAY BLOCK & DISTRICT HERE
+        let loc = '';
+        if(s.block || s.district) loc = `📍 ${escapeHtml(s.block || '')}, ${escapeHtml(s.district || '')}`;
+        else loc = `<span style="color:red">📍 Update Address</span>`;
+
+        div.innerHTML = `
+            <h3 style="margin:0 0 5px 0">${escapeHtml(s.name)}</h3>
+            <div class="school-meta">${loc}</div>
+            <div class="school-meta">👥 ${s.count} Students</div>
+        `;
         grid.appendChild(div);
     });
 }
@@ -280,9 +300,11 @@ function showDashboard(){
 function openSchoolDetail(name){
     const s = schoolsMap[name];
     currentSchoolStudents = allStudents.filter(x => x.schoolName === name);
+    
     document.getElementById('viewSchoolName').textContent = s.name;
     document.getElementById('viewAddress').textContent = `${s.block}, ${s.district} - ${s.pin}`;
     document.getElementById('viewContact').textContent = `📞 ${s.phone}`;
+    
     const sign = document.getElementById('viewHmSign');
     if(s.signature) { sign.src = s.signature; sign.style.display='block'; } 
     else { sign.style.display='none'; }
@@ -318,6 +340,8 @@ function updateSelection(){
     document.getElementById('selectionCount').textContent = `${n} selected`;
     const btn = document.getElementById('generateBtn');
     
+    // Allow generate if fonts and background exist (manual or auto)
+    // AI failure doesn't block generation, just face crop
     if(n > 0 && window.assets.font && window.assets.template) {
         btn.disabled = false;
         btn.innerHTML = `🖨 Generate <b>${n}</b> Cards`;
@@ -326,7 +350,7 @@ function updateSelection(){
     }
 }
 
-/* ---------- MANUAL UPLOAD ---------- */
+/* ---------- MANUAL UPLOAD HANDLERS ---------- */
 document.getElementById('fontInput').onchange = async e => {
     const f = e.target.files[0]; if(!f) return;
     const buf = await f.arrayBuffer();
@@ -342,62 +366,53 @@ document.getElementById('templateInput').onchange = e => {
     const img = new Image(); img.src = URL.createObjectURL(f);
     img.onload = () => {
         window.assets.template = img;
-        window.assets.mode = 'manual'; // SWITCH TO MANUAL
+        window.assets.mode = 'manual'; // SWITCH TO MANUAL IF USER UPLOADS
         document.getElementById('tplStatus').className = 'status-badge status-ok';
         document.getElementById('tplStatus').textContent = 'Manual Load';
         updateSelection();
     }
 };
 
-/* ---------- ROBUST AI LOADER ---------- */
+/* ---------- AI ENGINE ---------- */
 let FaceDetector = null, FilesetResolver = null, faceDetector = null;
-async function importVision(url){ try{ return await import(url); }catch(e){ console.warn('vision import fail', url, e); throw e; } }
+async function importVision(url){ try{ return await import(url); }catch(e){ return null; } }
 async function loadVisionBundle(){
-  const candidates = [
-    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs",
-    "https://unpkg.com/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs"
-  ];
-  for(const c of candidates){ try{ const mod = await importVision(c); return mod; } catch(e){ } }
-  throw new Error('vision bundle failed');
+  const c = ["https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs", "https://unpkg.com/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs"];
+  for(const u of c){ const m = await importVision(u); if(m) return m; }
+  throw new Error("Vision Bundle Failed");
 }
 async function initializeFaceDetector(){
   window.assets.aiModel = 'pending'; updateSelection();
   try{
     const mod = await loadVisionBundle(); 
     FaceDetector = mod.FaceDetector; FilesetResolver = mod.FilesetResolver;
-    const wasmCandidates = ["https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm","https://unpkg.com/@mediapipe/tasks-vision@0.10.14/wasm"];
-    let fileset = null;
-    for(const w of wasmCandidates){ try{ fileset = await FilesetResolver.forVisionTasks(w); break; }catch(e){ } }
-    if(!fileset) throw new Error('FilesetResolver failed');
+    const fileset = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
     faceDetector = await FaceDetector.createFromOptions(fileset, { baseOptions:{ modelAssetPath:"https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite", delegate:"GPU" }, minDetectionConfidence:0.5, runningMode:"IMAGE" });
     window.assets.aiModel = 'loaded'; document.getElementById('aiStatus').textContent = "✅ AI Ready";
   }catch(err){ 
-    window.assets.aiModel = 'failed'; 
-    document.getElementById('aiStatus').textContent = "⚠️ AI Failed (Simple Crop)";
+    window.assets.aiModel = 'failed'; document.getElementById('aiStatus').textContent = "⚠️ AI Failed (Using Basic Crop)";
   }
   updateSelection();
 }
 initializeFaceDetector();
 
-/* ---------- HELPER: REMOVE WHITE BG ---------- */
-function makeWhiteTransparent(img) {
+/* ---------- UTILS: TRANSPARENT BG ---------- */
+function removeWhiteBg(img) {
     const c = document.createElement('canvas');
     c.width = img.width; c.height = img.height;
     const cx = c.getContext('2d');
     cx.drawImage(img, 0, 0);
     const imgData = cx.getImageData(0,0, c.width, c.height);
-    const data = imgData.data;
-    for(let i=0; i<data.length; i+=4) {
-        const r = data[i], g = data[i+1], b = data[i+2];
-        if(r > 200 && g > 200 && b > 200) {
-            data[i+3] = 0; // Transparent
-        }
+    const d = imgData.data;
+    // Iterate pixels. If brightness > 200, make transparent
+    for(let i=0; i<d.length; i+=4) {
+        if(d[i]>200 && d[i+1]>200 && d[i+2]>200) d[i+3] = 0; 
     }
     cx.putImageData(imgData, 0, 0);
     return c;
 }
 
-/* ---------- DRAWING ENGINE ---------- */
+/* ---------- DRAWING ---------- */
 const canvas = document.getElementById('cardCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -408,46 +423,54 @@ async function drawCard(s) {
     // 1. Background
     ctx.drawImage(window.assets.template, 0, 0, CARD_W, CARD_H);
 
-    // 2. School Details & Signature (ONLY IF AUTO MODE)
+    // 2. School Details (ONLY IF AUTO MODE)
     if(window.assets.mode === 'auto') {
         const sm = schoolsMap[s.schoolName];
         
-        // School Name: Auto-scale to fit between 119px and 611px (Width = 492px)
-        const MAX_W = HEADER_MAX_X - HEADER_MIN_X;
         ctx.fillStyle = '#FFFFFF'; 
-        ctx.textAlign = 'center'; 
-        let fontSize = 45; // Starting Size
-        ctx.font = `bold ${fontSize}px OdiaFont`;
+        ctx.textAlign = 'left'; // Align from Left as per 121px coordinate
         
-        // Loop to shrink font if text is too wide
-        while (ctx.measureText(s.schoolName).width > MAX_W && fontSize > 10) {
-            fontSize--;
-            ctx.font = `bold ${fontSize}px OdiaFont`;
-        }
-        ctx.fillText(s.schoolName, HEADER_CENTER_X, HEADER_Y);
+        // --- School Name (Auto-Fit) ---
+        // Max Width = 611 - 119 = 492px
+        // Center X roughly (119+611)/2 = 365
+        // But user gave 121,55. Let's start there.
+        const MAX_W = SCHOOL_NAME_POS.maxX - SCHOOL_NAME_POS.x;
+        let fs = 45; // Start Size (~7 Bold)
+        ctx.font = `bold ${fs}px OdiaFont`;
+        while (ctx.measureText(s.schoolName).width > MAX_W && fs > 10) { fs--; ctx.font = `bold ${fs}px OdiaFont`; }
+        ctx.fillText(s.schoolName, SCHOOL_NAME_POS.x, SCHOOL_NAME_POS.y);
         
-        // Address (Block, District, Pin) at 198, 94
-        ctx.textAlign = 'left';
-        ctx.font = '32px OdiaFont'; 
-        const addrText = `${sm.block}, ${sm.district} - ${toOdiaDigits(sm.pin)}`;
-        ctx.fillText(addrText, ADDR_X, ADDR_Y);
+        // --- Address (198, 94) ---
+        ctx.font = '30px OdiaFont'; // ~9 Regular
+        // Construct Address String
+        let addr = [];
+        if(sm.block) addr.push(sm.block);
+        if(sm.district) addr.push(sm.district);
+        let addrTxt = addr.join(', ');
+        if(sm.pin) addrTxt += ' - ' + toOdiaDigits(sm.pin);
+        
+        ctx.fillText(addrTxt, ADDR_POS.x, ADDR_POS.y);
 
-        // Signature at 434, 881 (with BG removal)
+        // --- Signature (434, 881) ---
         if(sm && sm.signature) {
             const signImg = new Image(); signImg.src = sm.signature;
             await new Promise(r => signImg.onload=r);
-            const cleanSign = makeWhiteTransparent(signImg);
             
-            // Aspect ratio scaling
-            const ratio = Math.min(SIGN_MAX_W / cleanSign.width, SIGN_MAX_H / cleanSign.height);
-            const sw = cleanSign.width * ratio;
-            const sh = cleanSign.height * ratio;
+            // Remove Background
+            const cleanSign = removeWhiteBg(signImg);
             
-            ctx.drawImage(cleanSign, SIGN_X, SIGN_Y, sw, sh);
+            // Resize (Aspect Ratio)
+            const ratio = Math.min(SIGN_POS.maxW / cleanSign.width, SIGN_POS.maxH / cleanSign.height);
+            const dw = cleanSign.width * ratio;
+            const dh = cleanSign.height * ratio;
+            
+            // Center in box or top-left? User gave point 434,881. 
+            // We'll place Top-Left there.
+            ctx.drawImage(cleanSign, SIGN_POS.x, SIGN_POS.y, dw, dh);
         }
     }
 
-    // 3. Photo & Box (Standard Coordinates)
+    // 3. Photo & Text (Standard)
     const tplW = window.assets.template.width || CARD_W;
     const scale = CARD_W / tplW;
     const ORIG_PX = 222, ORIG_PY = 250, ORIG_PW = 187, ORIG_PH = 225;
@@ -461,30 +484,24 @@ async function drawCard(s) {
         const photo = new Image(); photo.src = s.photoBase64;
         await new Promise(r => photo.onload=r);
         let sx=0, sy=0, sw=photo.width, sh=photo.height;
-        
         if(window.assets.aiModel === 'loaded' && faceDetector) {
             try {
                 const det = faceDetector.detect(photo);
-                if(det && det.detections && det.detections.length > 0) {
-                    const bbox = det.detections[0].boundingBox;
-                    const add_w = parseInt(bbox.width * 0.6); 
-                    const add_h = parseInt(bbox.height * 1.4); 
-                    sx = Math.max(0, bbox.originX - add_w/2);
-                    sy = Math.max(0, bbox.originY - add_h/2);
-                    sw = Math.min(photo.width - sx, bbox.width + add_w);
-                    sh = Math.min(photo.height - sy, bbox.height + add_h);
+                if(det.detections.length > 0) {
+                    const b = det.detections[0].boundingBox;
+                    const ax=b.width*0.6, ay=b.height*1.4;
+                    sx=Math.max(0,b.originX-ax/2); sy=Math.max(0,b.originY-ay/2);
+                    sw=Math.min(photo.width-sx, b.width+ax); sh=Math.min(photo.height-sy, b.height+ay);
                 }
             } catch(e){}
         }
         ctx.drawImage(photo, sx, sy, sw, sh, px, py, pw, ph);
     }
 
-    // 4. Student Text
-    ctx.fillStyle = '#000'; ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
-    ctx.font = `${Math.round(38*scale)}px OdiaFont`;
+    // Student Text
+    ctx.fillStyle = '#000'; ctx.textAlign = 'left'; ctx.font = `${Math.round(38*scale)}px OdiaFont`;
     const tx = Math.round(227*scale);
-    let dob = s.dob || '';
-    try{ const [y,m,d] = dob.split('-'); if(y&&m&&d) dob = `${d}/${m}/${y}`; } catch(e){}
+    let dob = s.dob || ''; try{ const [y,m,d] = dob.split('-'); if(y&&m&&d) dob = `${d}/${m}/${y}`; } catch(e){}
     
     ctx.fillText(s.name||'', tx, Math.round((505+38)*scale));
     ctx.fillText(s.class||'', tx, Math.round((575+38)*scale));
@@ -501,7 +518,7 @@ async function drawCard(s) {
     return await new Promise(r => canvas.toBlob(r, 'image/png'));
 }
 
-/* ---------- GENERATE HANDLER ---------- */
+/* ---------- GENERATE ---------- */
 document.getElementById('generateBtn').onclick = async () => {
     const ids = Array.from(document.querySelectorAll('.sel:checked')).map(c => c.value);
     const targets = currentSchoolStudents.filter(s => ids.includes(s.id.toString()));
@@ -533,19 +550,15 @@ document.getElementById('generateBtn').onclick = async () => {
         if(i>0) verifyPdf.addPage([CARD_W, CARD_H], 'portrait');
         verifyPdf.addImage(imgObj, 'PNG', 0, 0, CARD_W, CARD_H);
         
+        // Watermark
         verifyPdf.saveGraphicsState();
         verifyPdf.setGState(new verifyPdf.GState({opacity: 0.3}));
-        verifyPdf.setTextColor(255, 0, 0); 
-        verifyPdf.setFontSize(30);
-        for(let r=-50; r<CARD_H+50; r+=150) {
-            for(let c=-50; c<CARD_W+50; c+=200) {
-                verifyPdf.text("VERIFICATION ONLY", c, r, {angle:45});
-            }
-        }
+        verifyPdf.setTextColor(255, 0, 0); verifyPdf.setFontSize(30);
+        for(let r=-50; r<CARD_H+50; r+=150) { for(let c=-50; c<CARD_W+50; c+=200) verifyPdf.text("VERIFICATION ONLY", c, r, {angle:45}); }
         verifyPdf.restoreGraphicsState();
     }
 
-    btn.textContent = "Building A4 Sheets...";
+    btn.textContent = "Building Sheets...";
     const pageCvs = document.createElement('canvas'); pageCvs.width=A4_W; pageCvs.height=A4_H;
     const pctx = pageCvs.getContext('2d');
     const GAP_X = 40, GAP_Y = 150;
@@ -576,10 +589,11 @@ document.getElementById('generateBtn').onclick = async () => {
     btn.disabled = false; updateSelection();
 };
 
-/* ---------- EDIT/DEL (FIXED) ---------- */
+/* ---------- EDIT/DEL ---------- */
 function openEditModal(id){
     const s = currentSchoolStudents.find(x => x.id == id);
     if(!s) { console.error('Student not found:', id); return; }
+    
     document.getElementById('editId').value = s.id;
     document.getElementById('editName').value = s.name;
     document.getElementById('editClass').value = s.class;
@@ -587,6 +601,13 @@ function openEditModal(id){
     document.getElementById('editDob').value = s.dob;
     document.getElementById('editBlood').value = s.bloodGroup;
     document.getElementById('editPhone').value = s.mobile || s.phone || '';
+    
+    // Fill School Details if available
+    const sm = schoolsMap[s.schoolName] || {};
+    document.getElementById('editBlock').value = s.block || sm.block || '';
+    document.getElementById('editDistrict').value = s.district || sm.district || '';
+    document.getElementById('editPin').value = s.pin || sm.pin || '';
+
     document.getElementById('editModal').style.display = 'flex';
 }
 
@@ -603,14 +624,27 @@ document.getElementById('saveEditBtn').onclick = async () => {
         roll: document.getElementById('editRoll').value,
         dob: document.getElementById('editDob').value,
         bloodGroup: document.getElementById('editBlood').value,
-        mobile: document.getElementById('editPhone').value
+        mobile: document.getElementById('editPhone').value,
+        // Save School Details to Student Rec
+        block: document.getElementById('editBlock').value,
+        district: document.getElementById('editDistrict').value,
+        pin: document.getElementById('editPin').value
     };
     try {
         await db.collection('students').doc(id.toString()).update(data);
         const s = currentSchoolStudents.find(x => x.id == id);
         if(s) Object.assign(s, data);
+        
+        // Update School Map for subsequent cards
+        const sm = schoolsMap[s.schoolName];
+        if(sm) { sm.block = data.block; sm.district = data.district; sm.pin = data.pin; }
+        
         document.getElementById('editModal').style.display='none';
         renderTable();
+        
+        // Refresh Header View
+        document.getElementById('viewAddress').textContent = `${data.block}, ${data.district} - ${data.pin}`;
+        
     } catch(e) { alert("Error: "+e.message); }
 };
 </script>
