@@ -151,6 +151,11 @@ const CARD_W = 638;  // 54mm @ 300dpi
 const CARD_H = 1012; // 85.6mm @ 300dpi
 const A4_W = 3508, A4_H = 2480;
 
+// Coordinate Configuration (User Provided)
+const SCHOOL_NAME_POS = { x: 121, y: 55, size: 45 }; // Approx 7 bold relative to DPI
+const SCHOOL_ADDR_POS = { x: 198, y: 94, size: 30 }; // Approx 9 regular relative to DPI
+const SIGN_POS = { x: 434, y: 881, w: 180, h: 60 };  // Adjusted width/height for constraints
+
 /* ---------- HELPERS ---------- */
 window.odiaDigits = ['୦','୧','୨','୩','୪','୫','୬','୭','୮','୯'];
 function toOdiaDigits(str){ if (str===undefined||str===null) return ''; return (''+str).replace(/\d/g,d=>window.odiaDigits[d]||d); }
@@ -161,11 +166,11 @@ let db = null;
 let allStudents = [];
 let schoolsMap = {};
 let currentSchoolStudents = [];
-window.assets = { template: null, font: null, aiModel: 'pending' };
+window.assets = { template: null, font: null, aiModel: 'pending', mode: 'manual' }; 
+// mode: 'manual' (uploaded) or 'auto' (background.png)
 
-/* ---------- AUTO-LOAD ASSETS ---------- */
+/* ---------- ASSET LOADER ---------- */
 async function loadAutoAssets() {
-    // 1. Load Font
     try {
         const resp = await fetch('OdiaFont.ttf');
         if(resp.ok) {
@@ -176,9 +181,8 @@ async function loadAutoAssets() {
             document.getElementById('fontStatus').className = 'status-badge status-ok';
             document.getElementById('fontStatus').textContent = 'Auto-Loaded';
         }
-    } catch(e) { console.log('Font load failed'); }
+    } catch(e) {}
 
-    // 2. Load Background PNG
     try {
         const resp = await fetch('background.png');
         if(resp.ok) {
@@ -187,16 +191,17 @@ async function loadAutoAssets() {
             img.src = URL.createObjectURL(blob);
             img.onload = () => {
                 window.assets.template = img;
+                window.assets.mode = 'auto'; // AUTO MODE
                 document.getElementById('tplStatus').className = 'status-badge status-ok';
                 document.getElementById('tplStatus').textContent = 'Auto-Loaded';
                 updateSelection();
             }
         }
-    } catch(e) { console.log('BG load failed'); }
+    } catch(e) {}
     updateSelection();
 }
 
-/* ---------- FIREBASE INIT ---------- */
+/* ---------- FIREBASE ---------- */
 try{
   const firebaseConfig = {
       apiKey: "AIzaSyC76wT0RbwuLGbhp0mU7kje25g-xxydLqU",
@@ -211,12 +216,12 @@ try{
   db = firebase.firestore();
   loadData();
   loadAutoAssets();
-} catch(e){ console.error(e); alert('Firebase error: '+e.message); }
+} catch(e){ alert('Firebase Error: '+e.message); }
 
 /* ---------- DATA LOGIC ---------- */
 function loadData(){
     const grid = document.getElementById('schoolGrid');
-    grid.innerHTML = '<p>Loading data...</p>';
+    grid.innerHTML = '<p>Loading...</p>';
     db.collection('students').get().then(qs => {
         allStudents = []; schoolsMap = {};
         qs.forEach(doc => {
@@ -233,6 +238,7 @@ function loadData(){
                 }
                 schoolsMap[d.schoolName].count++;
                 const sm = schoolsMap[d.schoolName];
+                // Update if later records have better data
                 if(!sm.signature && d.hmSignature) sm.signature = d.hmSignature;
                 if(!sm.block && d.block) sm.block = d.block;
             }
@@ -283,7 +289,6 @@ function renderTable(){
     document.getElementById('selectAll').checked = false;
     currentSchoolStudents.forEach((s, i) => {
         const tr = document.createElement('tr');
-        // IMPORTANT: Use quotes '${s.id}' to pass as string
         tr.innerHTML = `<td><input type="checkbox" class="sel" value="${s.id}"></td><td>${i+1}</td>
         <td><img class="thumb" src="${s.photoBase64 || ''}"></td>
         <td>${s.name}</td><td>${s.class}</td><td>${s.roll}</td><td>${s.dob}</td><td>${s.bloodGroup||''}</td><td>${s.mobile||''}</td>
@@ -303,19 +308,16 @@ function updateSelection(){
     document.getElementById('selectionCount').textContent = `${n} selected`;
     const btn = document.getElementById('generateBtn');
     
-    // AI is now optional ('pending' won't block it, only check if template and font exist)
+    // AI optional check
     if(n > 0 && window.assets.font && window.assets.template) {
         btn.disabled = false;
         btn.innerHTML = `🖨 Generate <b>${n}</b> Cards`;
     } else {
         btn.disabled = true;
-        if(!window.assets.template) btn.textContent = "Background Missing";
-        else if(!window.assets.font) btn.textContent = "Font Missing";
-        else btn.textContent = "Select Students";
     }
 }
 
-/* ---------- MANUAL UPLOAD ---------- */
+/* ---------- MANUAL UPLOAD HANDLERS ---------- */
 document.getElementById('fontInput').onchange = async e => {
     const f = e.target.files[0]; if(!f) return;
     const buf = await f.arrayBuffer();
@@ -331,27 +333,61 @@ document.getElementById('templateInput').onchange = e => {
     const img = new Image(); img.src = URL.createObjectURL(f);
     img.onload = () => {
         window.assets.template = img;
+        window.assets.mode = 'manual'; // SWITCH TO MANUAL MODE
         document.getElementById('tplStatus').className = 'status-badge status-ok';
         document.getElementById('tplStatus').textContent = 'Manual Load';
         updateSelection();
     }
 };
 
-/* ---------- AI ENGINE ---------- */
-let faceDetector=null;
-(async function(){
-    try {
-        const vision = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs");
-        const fileset = await vision.FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
-        faceDetector = await vision.FaceDetector.createFromOptions(fileset, { baseOptions:{ modelAssetPath:"https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite", delegate:"GPU" }, minDetectionConfidence:0.5 });
-        window.assets.aiModel = 'loaded'; document.getElementById('aiStatus').textContent = "✅ AI Ready";
-        updateSelection();
-    } catch(e) { 
-        window.assets.aiModel = 'failed'; 
-        document.getElementById('aiStatus').textContent = "⚠️ AI Failed (Using simple crop)";
-        updateSelection(); // Enable button anyway
+/* ---------- ROBUST AI LOADER ---------- */
+let FaceDetector = null, FilesetResolver = null, faceDetector = null;
+async function importVision(url){ try{ return await import(url); }catch(e){ console.warn('vision import fail', url, e); throw e; } }
+async function loadVisionBundle(){
+  const candidates = [
+    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs",
+    "https://unpkg.com/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs"
+  ];
+  for(const c of candidates){ try{ const mod = await importVision(c); return mod; } catch(e){ } }
+  throw new Error('vision bundle failed');
+}
+async function initializeFaceDetector(){
+  window.assets.aiModel = 'pending'; updateSelection();
+  try{
+    const mod = await loadVisionBundle(); 
+    FaceDetector = mod.FaceDetector; FilesetResolver = mod.FilesetResolver;
+    const wasmCandidates = ["https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm","https://unpkg.com/@mediapipe/tasks-vision@0.10.14/wasm"];
+    let fileset = null;
+    for(const w of wasmCandidates){ try{ fileset = await FilesetResolver.forVisionTasks(w); break; }catch(e){ } }
+    if(!fileset) throw new Error('FilesetResolver failed');
+    faceDetector = await FaceDetector.createFromOptions(fileset, { baseOptions:{ modelAssetPath:"https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite", delegate:"GPU" }, minDetectionConfidence:0.5, runningMode:"IMAGE" });
+    window.assets.aiModel = 'loaded'; document.getElementById('aiStatus').textContent = "✅ AI Ready";
+  }catch(err){ 
+    window.assets.aiModel = 'failed'; 
+    document.getElementById('aiStatus').textContent = "⚠️ AI Failed (Simple Crop)";
+  }
+  updateSelection();
+}
+initializeFaceDetector();
+
+/* ---------- HELPER: REMOVE WHITE BG ---------- */
+function makeWhiteTransparent(img) {
+    const c = document.createElement('canvas');
+    c.width = img.width; c.height = img.height;
+    const cx = c.getContext('2d');
+    cx.drawImage(img, 0, 0);
+    const imgData = cx.getImageData(0,0, c.width, c.height);
+    const data = imgData.data;
+    // Loop pixels. If light > 200, make transparent
+    for(let i=0; i<data.length; i+=4) {
+        const r = data[i], g = data[i+1], b = data[i+2];
+        if(r > 200 && g > 200 && b > 200) {
+            data[i+3] = 0; // Alpha 0
+        }
     }
-})();
+    cx.putImageData(imgData, 0, 0);
+    return c;
+}
 
 /* ---------- DRAWING ENGINE ---------- */
 const canvas = document.getElementById('cardCanvas');
@@ -361,23 +397,39 @@ async function drawCard(s) {
     canvas.width = CARD_W; canvas.height = CARD_H;
     ctx.clearRect(0,0,CARD_W,CARD_H);
 
-    // 1. Background (Guaranteed)
+    // 1. Background
     ctx.drawImage(window.assets.template, 0, 0, CARD_W, CARD_H);
 
-    // 2. School Name & Address (WHITE text on top header)
-    ctx.fillStyle = '#FFFFFF'; 
-    ctx.textAlign = 'center'; 
-    ctx.font = 'bold 45px OdiaFont';
-    ctx.fillText(s.schoolName, (CARD_W/2) + 60, 75); // Offset for Logo space
-    
-    const sm = schoolsMap[s.schoolName];
-    ctx.font = '30px OdiaFont';
-    ctx.fillText(`${sm.block}, ${sm.district} - ${toOdiaDigits(sm.pin)}`, (CARD_W/2) + 60, 125);
+    // 2. School Details & Signature (ONLY IF AUTO MODE)
+    if(window.assets.mode === 'auto') {
+        const sm = schoolsMap[s.schoolName];
+        
+        // School Name
+        ctx.fillStyle = '#FFFFFF'; 
+        ctx.textAlign = 'left'; // User specified coordinate likely implies left aligned
+        ctx.font = `bold ${SCHOOL_NAME_POS.size}px OdiaFont`;
+        // Coordinates provided: 121, 55
+        ctx.fillText(s.schoolName, SCHOOL_NAME_POS.x, SCHOOL_NAME_POS.y); 
+        
+        // Address
+        ctx.font = `${SCHOOL_ADDR_POS.size}px OdiaFont`;
+        // Coordinates: 198, 94. Combining Block, District, Pin
+        const addrText = `${sm.block}, ${sm.district} - ${toOdiaDigits(sm.pin)}`;
+        ctx.fillText(addrText, SCHOOL_ADDR_POS.x, SCHOOL_ADDR_POS.y);
 
-    // 3. Photo & Box (ORIGINAL LOGIC)
+        // Signature (with transparent BG)
+        if(sm && sm.signature) {
+            const signImg = new Image(); signImg.src = sm.signature;
+            await new Promise(r => signImg.onload=r);
+            const cleanSign = makeWhiteTransparent(signImg);
+            // Coordinates: 434, 881
+            ctx.drawImage(cleanSign, SIGN_POS.x, SIGN_POS.y, SIGN_POS.w, SIGN_POS.h);
+        }
+    }
+
+    // 3. Photo & Text (Standard Placement)
     const tplW = window.assets.template.width || CARD_W;
     const scale = CARD_W / tplW;
-    
     const ORIG_PX = 222, ORIG_PY = 250, ORIG_PW = 187, ORIG_PH = 225;
     const px = Math.round(ORIG_PX * scale), py = Math.round(ORIG_PY * scale);
     const pw = Math.round(ORIG_PW * scale), ph = Math.round(ORIG_PH * scale);
@@ -390,33 +442,30 @@ async function drawCard(s) {
         await new Promise(r => photo.onload=r);
         let sx=0, sy=0, sw=photo.width, sh=photo.height;
         
-        // AI Crop if available
         if(window.assets.aiModel === 'loaded' && faceDetector) {
             try {
                 const det = faceDetector.detect(photo);
-                if(det.detections.length > 0) {
-                    const box = det.detections[0].boundingBox;
-                    const padX = box.width * 0.5; const padY = box.height * 0.8;
-                    sx = Math.max(0, box.originX - padX);
-                    sy = Math.max(0, box.originY - padY);
-                    sw = Math.min(photo.width - sx, box.width + (padX*2));
-                    sh = Math.min(photo.height - sy, box.height + (padY*2));
+                if(det && det.detections && det.detections.length > 0) {
+                    const bbox = det.detections[0].boundingBox;
+                    const add_w = parseInt(bbox.width * 0.6); 
+                    const add_h = parseInt(bbox.height * 1.4); 
+                    sx = Math.max(0, bbox.originX - add_w/2);
+                    sy = Math.max(0, bbox.originY - add_h/2);
+                    sw = Math.min(photo.width - sx, bbox.width + add_w);
+                    sh = Math.min(photo.height - sy, bbox.height + add_h);
                 }
             } catch(e){}
         }
         ctx.drawImage(photo, sx, sy, sw, sh, px, py, pw, ph);
     }
 
-    // 4. Student Text (ORIGINAL LOGIC - RESTORED)
-    // Only filling values, assuming labels exist on background from previous version
+    // Student Text (Standard Placement)
     ctx.fillStyle = '#000'; ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
     ctx.font = `${Math.round(38*scale)}px OdiaFont`;
     const tx = Math.round(227*scale);
-    
     let dob = s.dob || '';
     try{ const [y,m,d] = dob.split('-'); if(y&&m&&d) dob = `${d}/${m}/${y}`; } catch(e){}
     
-    // Coordinates derived from original logic (505, 575, 647...)
     ctx.fillText(s.name||'', tx, Math.round((505+38)*scale));
     ctx.fillText(s.class||'', tx, Math.round((575+38)*scale));
     ctx.fillText(toOdiaDigits(dob), tx, Math.round((647+38)*scale));
@@ -427,16 +476,6 @@ async function drawCard(s) {
     if(s.bloodGroup){
         ctx.fillStyle = 'white'; ctx.font = `${Math.round(23*scale)}px OdiaFont`;
         ctx.fillText(s.bloodGroup, Math.round(480*scale), Math.round((360+23)*scale));
-    }
-
-    // 5. HM Signature (Bottom Right)
-    if(sm && sm.signature) {
-        const sign = new Image(); sign.src = sm.signature;
-        await new Promise(r => sign.onload=r);
-        const ratio = Math.min(200/sign.width, 80/sign.height);
-        const sw = sign.width * ratio;
-        const sh = sign.height * ratio;
-        ctx.drawImage(sign, CARD_W - sw - 30, CARD_H - 150, sw, sh);
     }
 
     return await new Promise(r => canvas.toBlob(r, 'image/png'));
@@ -476,6 +515,7 @@ document.getElementById('generateBtn').onclick = async () => {
         if(i>0) verifyPdf.addPage([CARD_W, CARD_H], 'portrait');
         verifyPdf.addImage(imgObj, 'PNG', 0, 0, CARD_W, CARD_H);
         
+        // Watermark
         verifyPdf.saveGraphicsState();
         verifyPdf.setGState(new verifyPdf.GState({opacity: 0.3}));
         verifyPdf.setTextColor(255, 0, 0); 
@@ -521,10 +561,8 @@ document.getElementById('generateBtn').onclick = async () => {
 
 /* ---------- EDIT/DEL (FIXED) ---------- */
 function openEditModal(id){
-    // Loose equality to catch string vs number issues
     const s = currentSchoolStudents.find(x => x.id == id);
     if(!s) { console.error('Student not found:', id); return; }
-    
     document.getElementById('editId').value = s.id;
     document.getElementById('editName').value = s.name;
     document.getElementById('editClass').value = s.class;
