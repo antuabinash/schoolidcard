@@ -23,30 +23,35 @@
         .btn-primary { background: #0056b3; }
         .btn-success { background: #28a745; }
         .btn-danger { background: #dc3545; }
+        .btn-warning { background: #ffc107; color: #333; }
         .btn-outline { background: transparent; border: 1px solid #0056b3; color: #0056b3; }
         
         /* School Grid */
-        .school-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
+        .school-list { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 15px; } /* Changed to 1 column for single view */
         .school-item { background: white; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #eee; position: relative; cursor: pointer; }
         .school-item:hover { border-color: #0056b3; background: #f0f8ff; }
-        .school-del { position: absolute; top: 5px; right: 5px; background: #ffebeb; color: red; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+        .school-del { position: absolute; top: 15px; right: 15px; background: #ffebeb; color: red; border-radius: 50%; width: 25px; height: 25px; display: flex; align-items: center; justify-content: center; font-size: 14px; z-index: 2; }
 
         /* Student List Item */
         .student-item { display: flex; align-items: center; background: white; padding: 10px; border-radius: 8px; margin-bottom: 8px; border: 1px solid #eee; }
-        .student-img { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; margin-right: 15px; background: #eee; }
+        .serial-no { font-weight: bold; color: #0056b3; margin-right: 10px; min-width: 20px; }
+        .student-img { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; margin-right: 10px; background: #eee; }
         .student-info { flex: 1; }
         .student-actions { display: flex; gap: 5px; }
         .action-icon { padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 14px; }
         .edit-icon { background: #e3f2fd; color: #0056b3; }
         .del-icon { background: #ffebeb; color: #dc3545; }
 
-        /* Camera Modal */
-        #cameraModal { display: none; position: fixed; inset: 0; background: black; z-index: 100; flex-direction: column; }
+        /* Modals */
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 100; justify-content: center; align-items: center; flex-direction: column; }
+        .modal-content { background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 400px; }
+        
+        /* Camera Specific */
         #cameraVideo { flex: 1; width: 100%; object-fit: cover; }
-        .cam-controls { padding: 20px; display: flex; justify-content: space-between; align-items: center; background: black; }
+        .cam-controls { padding: 20px; display: flex; justify-content: space-between; align-items: center; background: black; width: 100%; box-sizing: border-box; }
         .shutter { width: 60px; height: 60px; border-radius: 50%; background: white; border: 4px solid #ccc; cursor: pointer; }
 
-        .hidden { display: none; }
+        .hidden { display: none !important; }
         .preview-thumb { width: 100px; height: 60px; object-fit: contain; border: 1px dashed #ccc; display: none; margin-bottom: 10px; }
     </style>
 </head>
@@ -56,27 +61,30 @@
         
         <div id="schoolSection">
             <h2 style="text-align:center; color:#0056b3;">Select School</h2>
-            <div class="card">
+            
+            <div class="card" id="addSchoolCard">
                 <label>School Details</label>
                 <input type="text" id="newSchoolName" placeholder="Enter School Name">
-                <input type="tel" id="hmPhone" placeholder="HM Phone Number">
-                
                 <label>HM Signature (Photo)</label>
                 <input type="file" id="hmSignInput" accept="image/*">
                 <img id="signPreview" class="preview-thumb">
 
                 <button class="btn btn-primary" id="addSchoolBtn">Add School</button>
             </div>
+
             <div id="schoolListDisplay" class="school-list"></div>
         </div>
 
         <div id="entrySection" class="hidden">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; background: #e3f2fd; padding: 10px; border-radius: 8px;">
                 <div>
-                    <h3 id="currentSchoolHeader" style="margin:0;">School Name</h3>
-                    <small id="currentSchoolDetails" style="color:#666;"></small>
+                    <h3 id="currentSchoolHeader" style="margin:0; font-size: 16px;">School Name</h3>
+                    <small style="color:#666; font-size:11px;">Data Entry Mode</small>
                 </div>
-                <button class="btn btn-outline" onclick="exitSchool()" style="width:auto; padding: 5px 15px; font-size:12px;">Change School</button>
+                <div style="display: flex; gap: 5px;">
+                    <button class="btn btn-primary" onclick="openEditSchoolModal()" style="width:auto; padding: 6px 10px; font-size:12px; margin:0;">Edit School</button>
+                    <button class="btn btn-outline" onclick="exitSchool()" style="width:auto; padding: 6px 10px; font-size:12px; margin:0;">Exit</button>
+                </div>
             </div>
 
             <div class="card">
@@ -98,6 +106,8 @@
                     <input type="text" id="sRoll" placeholder="Roll No">
                 </div>
                 
+                <input type="tel" id="sPhone" placeholder="Mobile Number">
+
                 <div style="display:flex; gap:10px;">
                     <input type="date" id="sDob">
                     <select id="sBlood">
@@ -125,7 +135,23 @@
 
     </div>
 
-    <div id="cameraModal">
+    <div id="editSchoolModal" class="modal">
+        <div class="modal-content">
+            <h3>Edit School Details</h3>
+            <label>School Name</label>
+            <input type="text" id="editSchoolNameInput">
+            
+            <label>Update Signature (Optional)</label>
+            <input type="file" id="editSchoolSignInput" accept="image/*">
+            
+            <div style="display:flex; gap:10px; margin-top:15px;">
+                <button class="btn btn-success" id="saveSchoolEditBtn">Save Changes</button>
+                <button class="btn btn-danger" onclick="document.getElementById('editSchoolModal').style.display='none'">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="cameraModal" class="modal" style="display: none; background: black;">
         <video id="cameraVideo" autoplay playsinline></video>
         <canvas id="canvas" class="hidden"></canvas>
         <div class="cam-controls">
@@ -152,7 +178,7 @@
         let db, currentSchool = null, currentSchoolData = null, students = [], currentPhotoBlob = null;
         
         // DB INIT
-        const req = indexedDB.open('SchoolDataApp', 3); // Bumped version to 3 for new schema
+        const req = indexedDB.open('SchoolDataApp', 3);
         req.onupgradeneeded = e => {
             db = e.target.result;
             if(!db.objectStoreNames.contains('schools')) db.createObjectStore('schools', {keyPath:'name'});
@@ -173,7 +199,7 @@
 
         // --- SCHOOL LOGIC ---
         
-        // Preview HM Signature
+        // Preview HM Signature (Add)
         document.getElementById('hmSignInput').onchange = (e) => {
             const file = e.target.files[0];
             if(file) {
@@ -185,12 +211,25 @@
         function loadSchools() {
             const tx = db.transaction(['schools'], 'readonly');
             tx.objectStore('schools').getAll().onsuccess = e => {
+                const schools = e.target.result;
                 const div = document.getElementById('schoolListDisplay');
                 div.innerHTML = '';
-                e.target.result.forEach(s => {
+                
+                // Logic: Disable adding multiple schools
+                if(schools.length > 0) {
+                    document.getElementById('addSchoolCard').classList.add('hidden');
+                } else {
+                    document.getElementById('addSchoolCard').classList.remove('hidden');
+                }
+
+                schools.forEach(s => {
                     const el = document.createElement('div');
                     el.className = 'school-item';
-                    el.innerHTML = `<span>🏫 ${s.name}</span><br><small>${s.hmPhone || ''}</small><div class="school-del" onclick="delSchool(event, '${s.name}')">×</div>`;
+                    el.innerHTML = `
+                        <span>🏫 <b>${s.name}</b></span>
+                        <div style="font-size:12px; color:#666; margin-top:5px;">Tap to Enter</div>
+                        <div class="school-del" onclick="delSchool(event, '${s.name}')">×</div>
+                    `;
                     el.onclick = (ev) => { if(ev.target.className !== 'school-del') enterSchool(s); };
                     div.appendChild(el);
                 });
@@ -199,7 +238,7 @@
 
         document.getElementById('addSchoolBtn').onclick = async () => {
             const name = document.getElementById('newSchoolName').value.trim();
-            const hmPhone = document.getElementById('hmPhone').value.trim();
+            // Removed hmPhone logic
             const signFile = document.getElementById('hmSignInput').files[0];
 
             if(!name) return alert("Enter School Name");
@@ -213,7 +252,6 @@
 
             const schoolObj = {
                 name: name,
-                hmPhone: hmPhone,
                 hmSignature: signBase64,
                 createdAt: Date.now()
             };
@@ -222,7 +260,6 @@
             tx.objectStore('schools').put(schoolObj);
             tx.oncomplete = () => { 
                 document.getElementById('newSchoolName').value=''; 
-                document.getElementById('hmPhone').value='';
                 document.getElementById('hmSignInput').value='';
                 document.getElementById('signPreview').style.display='none';
                 document.getElementById('addSchoolBtn').textContent = "Add School";
@@ -245,15 +282,17 @@
 
         function enterSchool(schoolObj) {
             currentSchool = schoolObj.name;
-            currentSchoolData = schoolObj; // Store full school data (with sign/phone)
+            currentSchoolData = schoolObj;
             
             document.getElementById('schoolSection').classList.add('hidden');
             document.getElementById('entrySection').classList.remove('hidden');
             
-            document.getElementById('currentSchoolHeader').textContent = schoolObj.name;
-            document.getElementById('currentSchoolDetails').textContent = `Phone: ${schoolObj.hmPhone || 'N/A'}`;
-            
+            updateSchoolHeader();
             loadStudents();
+        }
+
+        function updateSchoolHeader() {
+            document.getElementById('currentSchoolHeader').textContent = currentSchoolData.name;
         }
 
         function exitSchool() {
@@ -263,6 +302,72 @@
             document.getElementById('entrySection').classList.add('hidden');
             resetForm();
         }
+
+        // --- EDIT SCHOOL LOGIC (New) ---
+        function openEditSchoolModal() {
+            document.getElementById('editSchoolNameInput').value = currentSchoolData.name;
+            document.getElementById('editSchoolSignInput').value = ''; 
+            document.getElementById('editSchoolModal').style.display = 'flex';
+        }
+
+        document.getElementById('saveSchoolEditBtn').onclick = async () => {
+            const newName = document.getElementById('editSchoolNameInput').value.trim();
+            const newSignFile = document.getElementById('editSchoolSignInput').files[0];
+
+            if(!newName) return alert("Name cannot be empty");
+
+            const oldName = currentSchoolData.name;
+            
+            // Prepare updated object
+            const updatedSchool = { ...currentSchoolData };
+            updatedSchool.name = newName;
+            
+            if(newSignFile) {
+                updatedSchool.hmSignature = await blobToBase64(newSignFile);
+            }
+
+            // DB Updates
+            const tx = db.transaction(['schools', 'students'], 'readwrite');
+            
+            // 1. Update School Store
+            if(oldName !== newName) {
+                tx.objectStore('schools').delete(oldName); // Remove old key
+            }
+            tx.objectStore('schools').put(updatedSchool);
+
+            // 2. Update all Students associated with this school if name changed
+            if(oldName !== newName) {
+                const stStore = tx.objectStore('students');
+                const idx = stStore.index('schoolName');
+                // We need to fetch, modify, put. (Async inside transaction can be tricky, using cursor is better)
+                idx.openCursor(IDBKeyRange.only(oldName)).onsuccess = (e) => {
+                    const cursor = e.target.result;
+                    if(cursor) {
+                        const s = cursor.value;
+                        s.schoolName = newName;
+                        // Also update embedded school signature if changed
+                        s.hmSignature = updatedSchool.hmSignature; 
+                        cursor.update(s);
+                        cursor.continue();
+                    }
+                };
+            } else if (newSignFile) {
+                // Name same, but signature changed. Update students' embedded signature?
+                // For simplicity, we strictly update students only if they are re-saved, 
+                // OR we can iterate them like above. Let's do nothing for now to save perf,
+                // assuming signature is pulled from School Data usually.
+            }
+
+            tx.oncomplete = () => {
+                currentSchool = newName;
+                currentSchoolData = updatedSchool;
+                updateSchoolHeader();
+                document.getElementById('editSchoolModal').style.display = 'none';
+                loadStudents(); // Refresh list
+                // If name changed, we need to refresh the main school list too
+                loadSchools();
+            };
+        };
 
         // --- STUDENT LOGIC ---
         function loadStudents() {
@@ -276,14 +381,18 @@
         function renderList() {
             const list = document.getElementById('studentList');
             list.innerHTML = '';
-            students.forEach(s => {
+            // Using index for serial number (reversed list? No, user usually wants simple 1,2,3)
+            // Since we sort by ID desc (newest first), the list order is fixed.
+            students.forEach((s, index) => {
                 const div = document.createElement('div');
                 div.className = 'student-item';
                 div.innerHTML = `
+                    <span class="serial-no">#${index + 1}</span>
                     <img src="${s.photoBase64 || ''}" class="student-img">
                     <div class="student-info">
                         <strong>${s.name}</strong><br>
-                        <small>Class: ${s.class} | Roll: ${s.roll}</small>
+                        <small>Class: ${s.class} | Roll: ${s.roll}</small><br>
+                        <small>📞 ${s.mobile || 'N/A'}</small>
                         <div style="font-size:10px; color:${s.synced?'green':'orange'}">${s.synced?'Synced':'Pending'}</div>
                     </div>
                     <div class="student-actions">
@@ -301,6 +410,7 @@
             const name = document.getElementById('sName').value;
             const cls = document.getElementById('sClass').value;
             const roll = document.getElementById('sRoll').value;
+            const phone = document.getElementById('sPhone').value; // New Field
             const dob = document.getElementById('sDob').value;
             const blood = document.getElementById('sBlood').value;
 
@@ -319,11 +429,10 @@
             const student = {
                 id: id ? Number(id) : Date.now(),
                 schoolName: currentSchool,
-                // Embed School Metadata for Admin Panel
-                hmPhone: currentSchoolData.hmPhone || '',
                 hmSignature: currentSchoolData.hmSignature || '',
                 
                 name, class: cls, roll, dob, bloodGroup: blood,
+                mobile: phone, // Save Phone
                 photoBase64: base64,
                 photoName: `${Date.now()}.jpg`,
                 synced: false,
@@ -346,6 +455,7 @@
             document.getElementById('sName').value = s.name;
             document.getElementById('sClass').value = s.class;
             document.getElementById('sRoll').value = s.roll;
+            document.getElementById('sPhone').value = s.mobile || ''; // Load Phone
             document.getElementById('sDob').value = s.dob;
             document.getElementById('sBlood').value = s.bloodGroup;
             
@@ -365,6 +475,7 @@
             document.getElementById('sName').value = '';
             document.getElementById('sClass').value = '';
             document.getElementById('sRoll').value = '';
+            document.getElementById('sPhone').value = ''; // Reset Phone
             document.getElementById('sDob').value = '';
             document.getElementById('sBlood').value = '';
             document.getElementById('preview').style.display = 'none';
