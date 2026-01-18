@@ -40,7 +40,7 @@
     .hm-section { text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
     .hm-sign-img { height: 50px; border: 1px solid #ddd; margin-top: 5px; background: white; padding: 2px; }
 
-    /* Configuration Panel (Inputs) */
+    /* Configuration Panel */
     .config-panel { background: #e3f2fd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #90caf9; display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
     
     /* Table */
@@ -325,7 +325,7 @@ function renderStudentTable(){
 
     currentSchoolStudents.forEach((s, idx) => {
         const tr = document.createElement('tr');
-        // Ensure ID is quoted for string passing
+        // Quoting ID to ensure string handling
         tr.innerHTML = `
             <td><input type="checkbox" class="student-select" value="${s.id}"></td>
             <td>${idx+1}</td>
@@ -483,8 +483,10 @@ document.getElementById('generateBtn').onclick = async () => {
         const zip = new JSZip();
         const singleFolder = zip.folder('cards_png');
         const { jsPDF } = window.jspdf;
-        const pdf = new jsPDF({ unit:'px', format:[CARD_W, CARD_H] });
         
+        // 1. Setup Verification PDF (Watermarked)
+        const verifyPdf = new jsPDF({ unit:'px', format:[CARD_W, CARD_H] });
+
         let singleImages = [];
         
         for(let i=0; i<dataToGen.length; i++){
@@ -493,14 +495,39 @@ document.getElementById('generateBtn').onclick = async () => {
             const img = new Image(); img.src = URL.createObjectURL(blob);
             await new Promise(r => img.onload=r);
             
+            // A. Save Raw PNG
             singleFolder.file(`${dataToGen[i].name}_${dataToGen[i].roll}.png`, blob);
-            
-            if(i > 0) pdf.addPage([CARD_W, CARD_H], 'portrait');
-            pdf.addImage(img, 'PNG', 0, 0, CARD_W, CARD_H);
             singleImages.push(img);
+
+            // B. Add to Verification PDF (With Watermark)
+            if(i > 0) verifyPdf.addPage([CARD_W, CARD_H], 'portrait');
+            verifyPdf.addImage(img, 'PNG', 0, 0, CARD_W, CARD_H);
+            
+            // --- DRAW WATERMARK (CROSS & TEXT) ---
+            verifyPdf.saveGraphicsState();
+            verifyPdf.setGState(new verifyPdf.GState({opacity: 0.5}));
+            
+            // Red Cross
+            verifyPdf.setDrawColor(255, 0, 0); // Red
+            verifyPdf.setLineWidth(5);
+            verifyPdf.line(0, 0, CARD_W, CARD_H);
+            verifyPdf.line(CARD_W, 0, 0, CARD_H);
+
+            // Text Overlay
+            verifyPdf.setTextColor(255, 0, 0);
+            verifyPdf.setFontSize(30);
+            // Translate to center to rotate text nicely
+            verifyPdf.text("VERIFICATION ONLY", CARD_W/2, CARD_H/2, {align:'center', angle: 45});
+            
+            verifyPdf.restoreGraphicsState();
+            // -------------------------------------
         }
+
+        btn.textContent = "Saving Verification PDF...";
+        zip.file("Verification_Proof.pdf", verifyPdf.output('arraybuffer'));
         
         btn.textContent = "Creating A4 Sheets...";
+        // 2. A4 Layout logic (Clean for Printing)
         const pageCanvas = document.createElement('canvas'); pageCanvas.width=A4_W; pageCanvas.height=A4_H;
         const pctx = pageCanvas.getContext('2d');
         const GAP_X = 40, GAP_Y = 150;
@@ -591,10 +618,8 @@ document.getElementById('saveEditBtn').onclick = async () => {
     };
     
     try {
-        // Ensure we are using String ID for Firestore Doc reference
         await db.collection('students').doc(id.toString()).update(update);
         
-        // Update local data (Loose equality match)
         const idx = allStudents.findIndex(x => x.id == id);
         if(idx !== -1) allStudents[idx] = { ...allStudents[idx], ...update };
         
