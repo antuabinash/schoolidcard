@@ -302,7 +302,6 @@ function updateSelection(){
     document.getElementById('selectionCount').textContent = `${n} selected`;
     const btn = document.getElementById('generateBtn');
     
-    // REQUIREMENT: Must have Background AND Font
     if(n > 0 && window.assets.font && window.assets.template && window.assets.aiModel !== 'pending') {
         btn.disabled = false;
         btn.innerHTML = `🖨 Generate <b>${n}</b> Cards`;
@@ -356,80 +355,82 @@ async function drawCard(s) {
     canvas.width = CARD_W; canvas.height = CARD_H;
     ctx.clearRect(0,0,CARD_W,CARD_H);
 
-    // 1. Draw Background PNG (Guaranteed to be present per user)
+    // 1. Draw Background PNG
     ctx.drawImage(window.assets.template, 0, 0, CARD_W, CARD_H);
 
-    // 2. School Name & Address (Dynamic Placement on top of PNG)
-    // Assuming orange header exists in PNG, we draw WHITE text on top
+    // 2. School Name & Address (Dynamic Placement - Centered Top)
     ctx.fillStyle = '#FFFFFF'; 
     ctx.textAlign = 'center'; 
     ctx.font = 'bold 45px OdiaFont';
-    // Position: Center Horizontal, Top Y area (~80px)
-    ctx.fillText(s.schoolName, (CARD_W/2) + 60, 75); // Offset +60 for logo space
+    ctx.fillText(s.schoolName, (CARD_W/2) + 60, 75); // Offset for Logo space
     
     // Address Line
     const sm = schoolsMap[s.schoolName];
     ctx.font = '30px OdiaFont';
     ctx.fillText(`${sm.block}, ${sm.district} - ${toOdiaDigits(sm.pin)}`, (CARD_W/2) + 60, 125);
 
-    // 3. Photo (Keep existing coordinates)
-    const px = 222, py = 280, pw = 200, ph = 240;
-    ctx.lineWidth = 4; ctx.strokeStyle = '#000';
-    ctx.strokeRect(px, py, pw, ph);
+    // 3. Photo & Black Box (ORIGINAL LOGIC - RESTORED)
+    // Scale calculation based on template width (standard logic)
+    const tplW = window.assets.template.width || CARD_W;
+    const scale = CARD_W / tplW;
     
+    // Coordinates from your original manual code
+    const ORIG_PX = 222, ORIG_PY = 250, ORIG_PW = 187, ORIG_PH = 225;
+    
+    const px = Math.round(ORIG_PX * scale), py = Math.round(ORIG_PY * scale);
+    const pw = Math.round(ORIG_PW * scale), ph = Math.round(ORIG_PH * scale);
+    const border = Math.max(2, Math.round(3 * scale));
+
+    // Black BG for photo border
+    ctx.fillStyle = '#000'; ctx.fillRect(px - border, py - border, pw + border*2, ph + border*2);
+
+    // Photo Drawing
     if(s.photoBase64) {
         const photo = new Image(); photo.src = s.photoBase64;
         await new Promise(r => photo.onload=r);
         let sx=0, sy=0, sw=photo.width, sh=photo.height;
+        
+        // AI Crop Logic
         if(window.assets.aiModel === 'loaded' && faceDetector) {
             try {
                 const det = faceDetector.detect(photo);
                 if(det.detections.length > 0) {
                     const box = det.detections[0].boundingBox;
-                    const padX = box.width * 0.5; const padY = box.height * 0.8;
-                    sx = Math.max(0, box.originX - padX);
-                    sy = Math.max(0, box.originY - padY);
-                    sw = Math.min(photo.width - sx, box.width + (padX*2));
-                    sh = Math.min(photo.height - sy, box.height + (padY*2));
+                    const add_w = parseInt(box.width * 0.6); 
+                    const add_h = parseInt(box.height * 1.4); 
+                    sx = Math.max(0, box.originX - add_w/2);
+                    sy = Math.max(0, box.originY - add_h/2);
+                    sw = Math.min(photo.width - sx, box.width + add_w);
+                    sh = Math.min(photo.height - sy, box.height + add_h);
                 }
             } catch(e){}
         }
         ctx.drawImage(photo, sx, sy, sw, sh, px, py, pw, ph);
     }
 
-    // 4. Blood Group Drop
-    if(s.bloodGroup) {
-        const bx = 500, by = 400;
-        ctx.fillStyle = '#dc3545';
-        ctx.beginPath();
-        ctx.moveTo(bx, by);
-        ctx.bezierCurveTo(bx-30, by+40, bx-30, by+70, bx, by+70);
-        ctx.bezierCurveTo(bx+30, by+70, bx+30, by+40, bx, by);
-        ctx.fill();
-        ctx.fillStyle = '#fff'; ctx.font = 'bold 24px OdiaFont'; ctx.textAlign = 'center';
-        ctx.fillText(s.bloodGroup, bx, by+50);
+    // 4. Student Text (ORIGINAL LOGIC - RESTORED)
+    // Only filling values, assuming labels exist on background
+    ctx.fillStyle = '#000'; ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+    ctx.font = `${Math.round(38*scale)}px OdiaFont`;
+    const tx = Math.round(227*scale);
+    
+    let dob = s.dob || '';
+    try{ const [y,m,d] = dob.split('-'); if(y&&m&&d) dob = `${d}/${m}/${y}`; } catch(e){}
+    
+    ctx.fillText(s.name||'', tx, Math.round((505+38)*scale));
+    ctx.fillText(s.class||'', tx, Math.round((575+38)*scale));
+    ctx.fillText(toOdiaDigits(dob), tx, Math.round((647+38)*scale));
+    ctx.fillText(toOdiaDigits(s.roll), tx, Math.round((718+38)*scale));
+    const phNum = s.mobile || s.phone || '';
+    ctx.fillText(toOdiaDigits(phNum), tx, Math.round((789+38)*scale));
+    
+    // Blood Group
+    if(s.bloodGroup){
+        ctx.fillStyle = 'white'; ctx.font = `${Math.round(23*scale)}px OdiaFont`;
+        ctx.fillText(s.bloodGroup, Math.round(480*scale), Math.round((360+23)*scale));
     }
 
-    // 5. Student Details (Labels and Values)
-    ctx.fillStyle = '#000'; ctx.textAlign = 'left'; ctx.font = '40px OdiaFont';
-    const lx = 50, rx = 280, startY = 600, gap = 70;
-    
-    const labels = ["ନାମ", "ଶ୍ରେଣୀ", "ଜନ୍ମ ତାରିଖ", "ରୋଲ୍ ନଂ", "ଫୋନ୍ ନଂ"];
-    const values = [
-        s.name, 
-        s.class, 
-        s.dob ? toOdiaDigits(s.dob.split('-').reverse().join('/')) : '', 
-        toOdiaDigits(s.roll), 
-        toOdiaDigits(s.mobile)
-    ];
-
-    labels.forEach((lbl, i) => {
-        const y = startY + (i*gap);
-        ctx.fillText(lbl, lx, y);
-        ctx.fillText(":  " + values[i], rx, y);
-    });
-
-    // 6. HM Signature (Bottom Right)
+    // 5. HM Signature (Bottom Right - NEW)
     if(sm && sm.signature) {
         const sign = new Image(); sign.src = sm.signature;
         await new Promise(r => sign.onload=r);
@@ -437,7 +438,7 @@ async function drawCard(s) {
         const ratio = Math.min(200/sign.width, 80/sign.height);
         const sw = sign.width * ratio;
         const sh = sign.height * ratio;
-        // Position roughly above the "Headmaster" text area
+        // Position: Bottom Right corner area
         ctx.drawImage(sign, CARD_W - sw - 30, CARD_H - 150, sw, sh);
     }
 
