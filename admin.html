@@ -193,7 +193,7 @@ function escapeHtml(s){ return (s+'').replace(/[&<>"'`]/g,c=>({'&':'&amp;','<':'
 /* ---------- State ---------- */
 let db = null;
 let allStudents = [];
-let schoolsMap = {}; // Object to group data
+let schoolsMap = {}; 
 let currentSchoolStudents = [];
 window.assets = { template:null, font:null, aiModel:'pending' };
 
@@ -226,23 +226,20 @@ function loadData(){
             const d = doc.data();
             allStudents.push(d);
             
-            // Extract school metadata from students
             if(d.schoolName){
                 if(!schoolsMap[d.schoolName]) {
                     schoolsMap[d.schoolName] = {
                         name: d.schoolName,
                         count: 0,
-                        // Capture metadata from first student found for this school
                         block: d.block || '',
                         district: d.district || '',
                         pin: d.pin || '',
-                        phone: d.hmPhone || d.mobile || '', // Fallback to student mobile if no HM phone
+                        phone: d.hmPhone || d.mobile || '',
                         signature: d.hmSignature || ''
                     };
                 }
                 schoolsMap[d.schoolName].count++;
                 
-                // Update metadata if found in later records (in case first record was empty)
                 const sm = schoolsMap[d.schoolName];
                 if(!sm.signature && d.hmSignature) sm.signature = d.hmSignature;
                 if(!sm.block && d.block) sm.block = d.block;
@@ -312,10 +309,8 @@ function openSchoolDetail(schoolName){
         dlBtn.style.display = 'none';
     }
 
-    // Render Table
     renderStudentTable();
     
-    // Switch View
     document.getElementById('dashboardView').classList.add('hidden');
     document.getElementById('detailView').classList.remove('hidden');
     window.scrollTo(0,0);
@@ -330,6 +325,7 @@ function renderStudentTable(){
 
     currentSchoolStudents.forEach((s, idx) => {
         const tr = document.createElement('tr');
+        // Ensure ID is quoted for string passing
         tr.innerHTML = `
             <td><input type="checkbox" class="student-select" value="${s.id}"></td>
             <td>${idx+1}</td>
@@ -348,7 +344,6 @@ function renderStudentTable(){
         tbody.appendChild(tr);
     });
     
-    // Listeners
     document.querySelectorAll('.student-select').forEach(cb => cb.addEventListener('change', updateSelection));
 }
 
@@ -373,7 +368,7 @@ function updateSelection(){
     }
 }
 
-/* ---------- AI & Generator Setup (Same as before) ---------- */
+/* ---------- AI & Generator Setup ---------- */
 let FaceDetector=null, FilesetResolver=null, faceDetector=null;
 async function initializeFaceDetector(){
   window.assets.aiModel = 'pending'; updateStatus();
@@ -419,7 +414,6 @@ async function generateCardImage(student){
   if(window.assets.template) ctx.drawImage(window.assets.template, 0, 0, CARD_W, CARD_H);
   else { ctx.fillStyle='white'; ctx.fillRect(0,0,CARD_W,CARD_H); }
   
-  // Coordinates based on previous context
   const ORIG_PX = 222, ORIG_PY = 250, ORIG_PW = 187, ORIG_PH = 225;
   const tplW = window.assets.template.width || CARD_W;
   const scale = CARD_W / tplW;
@@ -428,7 +422,6 @@ async function generateCardImage(student){
   const pw = Math.round(ORIG_PW * scale), ph = Math.round(ORIG_PH * scale);
   const border = Math.max(2, Math.round(3 * scale));
 
-  // Black BG for photo
   ctx.fillStyle = '#000'; ctx.fillRect(px - border, py - border, pw + border*2, ph + border*2);
 
   const photo = new Image(); photo.crossOrigin = "Anonymous";
@@ -437,7 +430,6 @@ async function generateCardImage(student){
       await new Promise(r => { photo.onload=r; photo.onerror=r; });
   }
 
-  // AI Face Crop
   let sx=0, sy=0, sW=photo.width||1, sH=photo.height||1;
   if(photo.width && faceDetector && window.assets.aiModel === 'loaded'){
       try {
@@ -456,7 +448,6 @@ async function generateCardImage(student){
   
   if(photo.width) ctx.drawImage(photo, sx, sy, sW, sH, px, py, pw, ph);
   
-  // Text Drawing
   ctx.fillStyle = '#000'; ctx.textBaseline = 'alphabetic';
   ctx.font = `${Math.round(38*scale)}px OdiaFont`;
   const tx = Math.round(227*scale);
@@ -510,7 +501,6 @@ document.getElementById('generateBtn').onclick = async () => {
         }
         
         btn.textContent = "Creating A4 Sheets...";
-        // A4 Layout logic (5x2 grid centered)
         const pageCanvas = document.createElement('canvas'); pageCanvas.width=A4_W; pageCanvas.height=A4_H;
         const pctx = pageCanvas.getContext('2d');
         const GAP_X = 40, GAP_Y = 150;
@@ -540,7 +530,7 @@ document.getElementById('generateBtn').onclick = async () => {
         
     } catch(e){ alert("Error: "+e.message); }
     
-    updateSelection(); // Reset Button Text
+    updateSelection();
 };
 
 /* ---------- Backup ---------- */
@@ -558,30 +548,38 @@ document.getElementById('downloadRawBtn').onclick = async () => {
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download='Backup.zip'; a.click();
 };
 
-/* ---------- Edit/Delete ---------- */
+/* ---------- Edit/Delete (FIXED) ---------- */
 function deleteStudent(id){
     if(!confirm("Delete this student permanently?")) return;
-    db.collection('students').doc(id).delete().then(() => {
-        allStudents = allStudents.filter(s => s.id !== id);
-        currentSchoolStudents = currentSchoolStudents.filter(s => s.id !== id);
+    db.collection('students').doc(id.toString()).delete().then(() => {
+        allStudents = allStudents.filter(s => s.id != id);
+        currentSchoolStudents = currentSchoolStudents.filter(s => s.id != id);
         renderStudentTable();
     });
 }
 
 function editStudent(id){
-    const s = currentSchoolStudents.find(x => x.id === id);
-    if(!s) return;
+    // Use loose equality (==) because id passed from HTML is string, but stored ID might be number
+    const s = currentSchoolStudents.find(x => x.id == id);
+    if(!s) {
+        console.error("Student not found", id);
+        return;
+    }
+    
     document.getElementById('editId').value = s.id;
-    document.getElementById('editName').value = s.name;
-    document.getElementById('editClass').value = s.class;
-    document.getElementById('editRoll').value = s.roll;
-    document.getElementById('editDob').value = s.dob;
-    document.getElementById('editBlood').value = s.bloodGroup;
+    document.getElementById('editName').value = s.name || '';
+    document.getElementById('editClass').value = s.class || '';
+    document.getElementById('editRoll').value = s.roll || '';
+    document.getElementById('editDob').value = s.dob || '';
+    document.getElementById('editBlood').value = s.bloodGroup || '';
     document.getElementById('editPhone').value = s.mobile || s.phone || '';
     document.getElementById('editModal').style.display = 'flex';
 }
 
 document.getElementById('saveEditBtn').onclick = async () => {
+    const btn = document.getElementById('saveEditBtn');
+    btn.disabled = true; btn.textContent = "Saving...";
+    
     const id = document.getElementById('editId').value;
     const update = {
         name: document.getElementById('editName').value,
@@ -592,17 +590,24 @@ document.getElementById('saveEditBtn').onclick = async () => {
         mobile: document.getElementById('editPhone').value
     };
     
-    await db.collection('students').doc(id).update(update);
+    try {
+        // Ensure we are using String ID for Firestore Doc reference
+        await db.collection('students').doc(id.toString()).update(update);
+        
+        // Update local data (Loose equality match)
+        const idx = allStudents.findIndex(x => x.id == id);
+        if(idx !== -1) allStudents[idx] = { ...allStudents[idx], ...update };
+        
+        const idx2 = currentSchoolStudents.findIndex(x => x.id == id);
+        if(idx2 !== -1) currentSchoolStudents[idx2] = { ...currentSchoolStudents[idx2], ...update };
+        
+        document.getElementById('editModal').style.display = 'none';
+        renderStudentTable();
+    } catch(e) {
+        alert("Error saving: " + e.message);
+    }
     
-    // Update local data
-    const idx = allStudents.findIndex(x => x.id == id);
-    if(idx !== -1) allStudents[idx] = { ...allStudents[idx], ...update };
-    
-    const idx2 = currentSchoolStudents.findIndex(x => x.id == id);
-    if(idx2 !== -1) currentSchoolStudents[idx2] = { ...currentSchoolStudents[idx2], ...update };
-    
-    document.getElementById('editModal').style.display = 'none';
-    renderStudentTable();
+    btn.disabled = false; btn.textContent = "Save Changes";
 };
 </script>
 </body>
