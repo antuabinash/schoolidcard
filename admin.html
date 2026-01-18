@@ -277,7 +277,6 @@ function loadData(){
                 }
                 schoolsMap[d.schoolName].count++;
                 
-                // Prioritize finding valid metadata
                 const sm = schoolsMap[d.schoolName];
                 if(!sm.signature && d.hmSignature) sm.signature = d.hmSignature;
                 if(!sm.block && d.block) sm.block = d.block;
@@ -325,11 +324,7 @@ function showDashboard(){
 }
 
 function openSchoolDetail(name){
-    // Decode HTML entities if necessary or just use map lookup
-    // Simple lookup:
     let s = schoolsMap[name];
-    // If passed via HTML attribute, name might need un-escaping is handled by browser usually? 
-    // Best to find key safely.
     if(!s) s = schoolsMap[Object.keys(schoolsMap).find(k => k === name)];
     
     currentSchoolStudents = allStudents.filter(x => x.schoolName === name);
@@ -427,7 +422,7 @@ async function initializeFaceDetector(){
 }
 initializeFaceDetector();
 
-/* ---------- UTILS ---------- */
+/* ---------- UTILS: SMART TRANSPARENCY ---------- */
 function removeWhiteBg(img) {
     const c = document.createElement('canvas');
     c.width = img.width; c.height = img.height;
@@ -435,8 +430,19 @@ function removeWhiteBg(img) {
     cx.drawImage(img, 0, 0);
     const imgData = cx.getImageData(0,0, c.width, c.height);
     const d = imgData.data;
+    
+    // Improved Logic: Detect gray levels more aggressively (150+)
     for(let i=0; i<d.length; i+=4) {
-        if(d[i]>200 && d[i+1]>200 && d[i+2]>200) d[i+3] = 0; 
+        const r = d[i], g = d[i+1], b = d[i+2];
+        const bright = (r+g+b)/3;
+        
+        // If bright enough, make transparent
+        if(bright > 150) {
+            d[i+3] = 0; 
+        } else {
+            // Else, make it pure black for better visibility
+            d[i] = 0; d[i+1] = 0; d[i+2] = 0;
+        }
     }
     cx.putImageData(imgData, 0, 0);
     return c;
