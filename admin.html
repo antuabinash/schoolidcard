@@ -7,169 +7,175 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-
   <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
 
   <style>
-    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Oriya", sans-serif; padding:20px; background:#f4f7f6; color:#222; }
-    .card { max-width:1200px; margin:12px auto; padding:18px; background:#fff; border-radius:8px; box-shadow:0 6px 18px rgba(0,0,0,0.04); }
-    h1{ color:#0b53a0; margin:0 0 12px 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; padding:20px; background:#f4f7f6; color:#222; }
+    .container { max-width:1200px; margin:0 auto; }
+    h1 { color:#0b53a0; margin-bottom: 20px; }
     
-    .controls { display:flex; gap:15px; flex-wrap:wrap; align-items:center; margin-bottom:12px; justify-content: space-between; }
-    .control-group { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-    
-    select,input,button { padding:10px; border-radius:6px; border:1px solid #ccc; font-size:14px; box-sizing: border-box; }
-    button{ background:#28a745;color:#fff;border:none;cursor:pointer; font-weight: 600; }
-    button:disabled{ background:#999; cursor:not-allowed; }
-    #downloadZipBtn{ background:#ffc107;color:#222; }
-    #refreshBtn{ background:#17a2b8; }
-    
-    #hmInfoPanel { display: none; align-items: center; gap: 10px; background: #e3f2fd; padding: 5px 12px; border-radius: 6px; border: 1px solid #90caf9; font-size: 13px; }
-    .hm-sign-thumb { height: 30px; border: 1px solid #fff; background: white; }
-    
-    table{ width:100%; border-collapse:collapse; margin-top:10px; font-size: 14px; }
-    th,td{ padding:8px 10px; border:1px solid #e6eef6; vertical-align:middle; text-align:left; }
-    th{ background:#0b69d1; color:#fff; position: sticky; top: 0; }
-    img.thumb{ width:40px; height:40px; object-fit:cover; border-radius:4px; cursor:pointer; }
-    
-    .checkbox-col { width: 30px; text-align: center; }
-    .sn-col { width: 40px; text-align: center; font-weight: bold; color: #555; }
-    input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
+    /* Utility */
+    .hidden { display: none !important; }
+    .btn { padding:10px 15px; border-radius:6px; border:none; cursor:pointer; font-weight:600; color:white; }
+    .btn-primary { background:#007bff; }
+    .btn-success { background:#28a745; }
+    .btn-danger { background:#dc3545; }
+    .btn-warning { background:#ffc107; color:#222; }
+    .btn-secondary { background:#6c757d; }
+    input, select { padding:10px; border-radius:6px; border:1px solid #ccc; }
 
-    .generator-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:end; }
+    /* VIEW 1: School Grid */
+    .school-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; }
+    .school-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); cursor: pointer; transition: transform 0.2s; border: 1px solid #eee; }
+    .school-card:hover { transform: translateY(-3px); border-color: #007bff; }
+    .school-card h3 { margin: 0 0 10px 0; color: #0b53a0; }
+    .school-meta { font-size: 13px; color: #666; margin-bottom: 5px; }
+
+    /* VIEW 2: School Detail */
+    .detail-header { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: start; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+    .school-info h2 { margin: 0 0 5px 0; color: #0b53a0; }
+    .school-address { color: #555; font-size: 14px; }
+    .hm-section { text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
+    .hm-sign-img { height: 50px; border: 1px solid #ddd; margin-top: 5px; background: white; padding: 2px; }
+
+    /* Configuration Panel (Inputs) */
+    .config-panel { background: #e3f2fd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #90caf9; display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
     
+    /* Table */
+    .table-container { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); overflow-x: auto; }
+    table { width:100%; border-collapse:collapse; font-size: 14px; }
+    th, td { padding:10px; border-bottom:1px solid #eee; text-align:left; vertical-align: middle; }
+    th { background:#f8f9fa; color:#333; font-weight: 600; }
+    img.thumb { width:35px; height:35px; border-radius:4px; object-fit: cover; border: 1px solid #ddd; }
+
+    /* Bottom Action Bar */
+    .action-bar { margin-top: 20px; padding: 20px; background: white; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); position: sticky; bottom: 0; }
+    .status-text { font-style: italic; color: #666; }
+
     /* Modals */
-    .modal{ display:none; position:fixed; left:0; top:0; right:0; bottom:0; background:rgba(0,0,0,0.55); align-items:center; justify-content:center; z-index:2000}
-    .modal-content{ background:#fff; padding:20px; border-radius:8px; width:90%; max-width:500px; text-align: left; }
-    .modal-buttons{ display:flex; gap:10px; margin-top:20px; justify-content: flex-end; }
-    
-    /* Edit Form Styles */
-    .form-row { display: flex; gap: 10px; margin-bottom: 10px; }
-    .form-group { flex: 1; }
-    .form-group label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 12px; color: #555; }
-    .form-group input, .form-group select { width: 100%; }
+    .modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:2000; align-items:center; justify-content:center; }
+    .modal-content { background:white; padding:25px; border-radius:8px; width:90%; max-width:400px; }
+    .form-group { margin-bottom: 15px; }
+    .form-group label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; }
+    .form-group input, .form-group select { width: 100%; box-sizing: border-box; }
+    .modal-btns { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
 
-    @media(max-width:720px){ .generator-grid{ grid-template-columns:1fr } table{ font-size:12px } }
+    @media(max-width:768px) {
+        .detail-header { flex-direction: column; gap: 15px; }
+        .hm-section { align-items: flex-start; text-align: left; }
+        .action-bar { flex-direction: column; gap: 10px; }
+        .btn { width: 100%; }
+    }
   </style>
 </head>
 <body>
-  <h1>Admin Panel: Student Data</h1>
 
-  <div class="card">
-    <h2 style="margin:0 0 10px 0">ID Card Generator</h2>
-    <div class="generator-grid">
-      <div>
-        <label>1. Upload Template (.png)</label><br>
-        <input id="templateInput" type="file" accept="image/png" style="width:95%">
-      </div>
-      <div>
-        <label>2. Upload Odia Font (.ttf)</label><br>
-        <input id="fontInput" type="file" accept=".ttf,.otf,font/ttf,font/otf" style="width:95%">
-      </div>
-      <button id="generateBtn" disabled style="grid-column:1 / -1; margin-top:6px;">Select Students First</button>
-    </div>
-    <p id="generatorStatus" style="font-style:italic;color:#555;margin-top:10px">Status: ❌ Template, ❌ Font, ⏳ AI Model...</p>
-  </div>
+<div class="container">
 
-  <div class="card">
-    <div class="controls">
-      <div class="control-group">
-        <select id="schoolFilter"><option value="all">All Schools</option></select>
-        <div id="hmInfoPanel">
-             <span id="hmPhoneDisplay" style="color:#0277bd; font-weight:bold;"></span>
-             <img id="hmSignDisplay" class="hm-sign-thumb" src="">
-             <a id="hmSignDownload" href="#" download="sign.png" style="font-size:12px;">⬇ Sign</a>
+  <div id="dashboardView">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <h1>Admin Dashboard</h1>
+        <div>
+            <button class="btn btn-primary" onclick="loadData()">🔄 Refresh Data</button>
+            <button class="btn btn-warning" id="downloadRawBtn">💾 Backup All Data</button>
         </div>
-      </div>
-      <div class="control-group">
-        <button id="refreshBtn">🔄 Refresh</button>
-        <button id="downloadZipBtn">💾 Raw Backup (ZIP)</button>
-        <button id="deleteAllBtn" style="background:#dc3545;">Delete All</button>
-      </div>
     </div>
-
-    <table id="studentTable">
-      <thead>
-        <tr>
-            <th class="checkbox-col"><input type="checkbox" id="selectAll"></th>
-            <th class="sn-col">S.N.</th>
-            <th>Photo</th><th>Name</th><th>Class</th><th>Roll</th><th>DOB</th><th>Blood</th><th>Phone</th><th>School</th><th>Actions</th>
-        </tr>
-      </thead>
-      <tbody><tr><td colspan="11" style="text-align:center">Loading data...</td></tr></tbody>
-    </table>
+    <div id="schoolGrid" class="school-grid">
+        <p>Loading schools...</p>
+    </div>
   </div>
 
-  <canvas id="cardCanvas" style="display:none;"></canvas>
-
-  <div id="confirmModal" class="modal"><div class="modal-content" style="text-align:center;">
-    <p id="confirmText">Are you sure?</p>
-    <div class="modal-buttons" style="justify-content:center;">
-        <button id="confirmYesBtn" style="background:#dc3545;color:#fff">Yes, delete</button>
-        <button id="confirmNoBtn">Cancel</button>
+  <div id="detailView" class="hidden">
+    <button class="btn btn-secondary" onclick="showDashboard()" style="margin-bottom:15px;">← Back to Schools</button>
+    
+    <div class="detail-header">
+        <div class="school-info">
+            <h2 id="viewSchoolName">School Name</h2>
+            <div class="school-address">
+                <span id="viewBlock"></span> <span id="viewDistrict"></span> <span id="viewPin"></span>
+            </div>
+            <div style="margin-top:5px; color:#0277bd; font-weight:bold;" id="viewContact"></div>
+        </div>
+        <div class="hm-section">
+            <small>Headmaster Signature</small>
+            <img id="viewHmSign" class="hm-sign-img" src="" alt="No Sign">
+            <a id="downloadSignBtn" href="#" download style="font-size:11px; margin-top:2px;">Download Sign</a>
+        </div>
     </div>
-  </div></div>
 
-  <div id="editModal" class="modal">
+    <div class="config-panel">
+        <div>
+            <label style="font-size:12px; font-weight:bold;">1. ID Card Template (.png)</label><br>
+            <input id="templateInput" type="file" accept="image/png">
+        </div>
+        <div>
+            <label style="font-size:12px; font-weight:bold;">2. Odia Font (.ttf)</label><br>
+            <input id="fontInput" type="file" accept=".ttf,.otf">
+        </div>
+        <div style="flex:1; text-align:right;">
+             <span id="generatorStatus" class="status-text">Status: ❌ Template, ❌ Font, ⏳ AI...</span>
+        </div>
+    </div>
+
+    <div class="table-container">
+        <table id="studentTable">
+            <thead>
+                <tr>
+                    <th style="width:30px;"><input type="checkbox" id="selectAll"></th>
+                    <th>#</th>
+                    <th>Photo</th>
+                    <th>Name</th>
+                    <th>Class</th>
+                    <th>Roll</th>
+                    <th>DOB</th>
+                    <th>Blood</th>
+                    <th>Phone</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <div class="action-bar">
+        <div>
+            <span id="selectionCount">0 students selected</span>
+        </div>
+        <button id="generateBtn" class="btn btn-success" disabled style="font-size:16px; padding: 12px 24px;">
+            🖨 Generate ID Cards
+        </button>
+    </div>
+
+  </div>
+</div>
+
+<canvas id="cardCanvas" style="display:none;"></canvas>
+
+<div id="editModal" class="modal">
     <div class="modal-content">
-        <h3 style="margin-top:0;">Edit Student Details</h3>
+        <h3>Edit Student</h3>
         <input type="hidden" id="editId">
-        
-        <div class="form-group">
-            <label>Full Name</label>
-            <input type="text" id="editName">
+        <div class="form-group"><label>Name</label><input type="text" id="editName"></div>
+        <div style="display:flex; gap:10px;">
+            <div class="form-group"><label>Class</label><input type="text" id="editClass"></div>
+            <div class="form-group"><label>Roll</label><input type="text" id="editRoll"></div>
         </div>
-
-        <div class="form-row">
-            <div class="form-group">
-                <label>Class</label>
-                <input type="text" id="editClass">
-            </div>
-            <div class="form-group">
-                <label>Roll No</label>
-                <input type="text" id="editRoll">
-            </div>
+        <div style="display:flex; gap:10px;">
+            <div class="form-group"><label>DOB</label><input type="date" id="editDob"></div>
+            <div class="form-group"><label>Blood</label><select id="editBlood">
+                <option value="">-</option><option value="A+">A+</option><option value="B+">B+</option>
+                <option value="O+">O+</option><option value="AB+">AB+</option>
+            </select></div>
         </div>
-
-        <div class="form-row">
-            <div class="form-group">
-                <label>Date of Birth</label>
-                <input type="date" id="editDob">
-            </div>
-            <div class="form-group">
-                <label>Blood Group</label>
-                <select id="editBlood">
-                    <option value="">Select</option>
-                    <option value="A+">A+</option><option value="A-">A-</option>
-                    <option value="B+">B+</option><option value="B-">B-</option>
-                    <option value="O+">O+</option><option value="O-">O-</option>
-                    <option value="AB+">AB+</option><option value="AB-">AB-</option>
-                </select>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label>Phone Number</label>
-            <input type="text" id="editPhone">
-        </div>
-
-        <div class="modal-buttons">
-            <button id="saveEditBtn">Save Changes</button>
-            <button id="cancelEditBtn" style="background:#6c757d;">Cancel</button>
+        <div class="form-group"><label>Mobile</label><input type="text" id="editPhone"></div>
+        <div class="modal-btns">
+            <button class="btn btn-secondary" onclick="document.getElementById('editModal').style.display='none'">Cancel</button>
+            <button class="btn btn-primary" id="saveEditBtn">Save Changes</button>
         </div>
     </div>
-  </div>
-
-  <div id="deleteAllModal" class="modal"><div class="modal-content" style="text-align:center;">
-    <p id="deleteAllText">Delete ALL student records?</p>
-    <div class="modal-buttons" style="justify-content:center;">
-        <button id="deleteAllYesBtn" style="background:#dc3545;color:#fff">Delete All</button>
-        <button id="deleteAllNoBtn">Cancel</button>
-    </div>
-  </div></div>
+</div>
 
 <script>
 /* ---------- Constants ---------- */
@@ -184,127 +190,190 @@ window.odiaDigits = ['୦','୧','୨','୩','୪','୫','୬','୭','୮','୯'
 function toOdiaDigits(str){ if (str===undefined||str===null) return ''; return (''+str).replace(/\d/g,d=>window.odiaDigits[d]||d); }
 function escapeHtml(s){ return (s+'').replace(/[&<>"'`]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;'}[c])); }
 
-/* ---------- DOM ---------- */
-const tableBody = document.querySelector('#studentTable tbody');
-const schoolFilter = document.getElementById('schoolFilter');
-const selectAllCheckbox = document.getElementById('selectAll');
-const hmInfoPanel = document.getElementById('hmInfoPanel');
-const hmPhoneDisplay = document.getElementById('hmPhoneDisplay');
-const hmSignDisplay = document.getElementById('hmSignDisplay');
-const hmSignDownload = document.getElementById('hmSignDownload');
-const generatorStatus = document.getElementById('generatorStatus');
-const generateBtn = document.getElementById('generateBtn');
-
 /* ---------- State ---------- */
 let db = null;
 let allStudents = [];
-let idToDelete = null;
-window.assets = { template:null, templateWidth:0, templateHeight:0, font:null, aiModel:'pending' };
+let schoolsMap = {}; // Object to group data
+let currentSchoolStudents = [];
+window.assets = { template:null, font:null, aiModel:'pending' };
 
 /* ---------- Firebase Init ---------- */
 try{
   const firebaseConfig = {
-    apiKey: "AIzaSyC76wT0RbwuLGbhp0mU7kje25g-xxydLqU",
-    authDomain: "idcard-60586.firebaseapp.com",
-    projectId: "idcard-60586",
-    storageBucket: "idcard-60586.firebasestorage.app",
-    messagingSenderId: "331979663377",
-    appId: "1:331979663377:web:026e537a7fcaca813129b0",
-    measurementId: "G-PXVV87C78S"
+      apiKey: "AIzaSyC76wT0RbwuLGbhp0mU7kje25g-xxydLqU",
+      authDomain: "idcard-60586.firebaseapp.com",
+      projectId: "idcard-60586",
+      storageBucket: "idcard-60586.firebasestorage.app",
+      messagingSenderId: "331979663377",
+      appId: "1:331979663377:web:026e537a7fcaca813129b0",
+      measurementId: "G-PXVV87C78S"
   };
   firebase.initializeApp(firebaseConfig);
   db = firebase.firestore();
-  window.db = db;
   loadData();
 } catch(e){ console.error(e); alert('Firebase error: '+e.message); }
 
-/* ---------- Data Loading ---------- */
+/* ---------- Data Loading Logic ---------- */
 function loadData(){
-  tableBody.innerHTML = '<tr><td colspan="11" style="text-align:center">Loading...</td></tr>';
-  if(!db) return;
-  db.collection('students').get().then(qs=>{
-    allStudents = []; const schools = new Set();
-    qs.forEach(doc=>{ const d=doc.data(); allStudents.push(d); if(d.schoolName) schools.add(d.schoolName); });
-    allStudents.sort((a,b)=> (b.submittedAt?.toMillis()||0) - (a.submittedAt?.toMillis()||0));
-    window.allStudents = allStudents;
+    const grid = document.getElementById('schoolGrid');
+    grid.innerHTML = '<p>Loading data...</p>';
     
-    const currentVal = schoolFilter.value;
-    schoolFilter.innerHTML = '<option value="all">All Schools</option>';
-    Array.from(schools).forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s; schoolFilter.appendChild(o); });
-    schoolFilter.value = currentVal;
+    db.collection('students').get().then(qs => {
+        allStudents = [];
+        schoolsMap = {};
+
+        qs.forEach(doc => {
+            const d = doc.data();
+            allStudents.push(d);
+            
+            // Extract school metadata from students
+            if(d.schoolName){
+                if(!schoolsMap[d.schoolName]) {
+                    schoolsMap[d.schoolName] = {
+                        name: d.schoolName,
+                        count: 0,
+                        // Capture metadata from first student found for this school
+                        block: d.block || '',
+                        district: d.district || '',
+                        pin: d.pin || '',
+                        phone: d.hmPhone || d.mobile || '', // Fallback to student mobile if no HM phone
+                        signature: d.hmSignature || ''
+                    };
+                }
+                schoolsMap[d.schoolName].count++;
+                
+                // Update metadata if found in later records (in case first record was empty)
+                const sm = schoolsMap[d.schoolName];
+                if(!sm.signature && d.hmSignature) sm.signature = d.hmSignature;
+                if(!sm.block && d.block) sm.block = d.block;
+            }
+        });
+
+        renderDashboard();
+    }).catch(err => {
+        grid.innerHTML = `<p style="color:red">Error: ${err.message}</p>`;
+    });
+}
+
+function renderDashboard(){
+    const grid = document.getElementById('schoolGrid');
+    grid.innerHTML = '';
     
-    filterAndRender();
-  }).catch(err=>{ console.error(err); tableBody.innerHTML = `<tr><td colspan="11">Error: ${escapeHtml(err.message)}</td></tr>`; });
+    const schoolNames = Object.keys(schoolsMap).sort();
+    
+    if(schoolNames.length === 0){
+        grid.innerHTML = '<p>No schools found.</p>';
+        return;
+    }
+
+    schoolNames.forEach(name => {
+        const s = schoolsMap[name];
+        const div = document.createElement('div');
+        div.className = 'school-card';
+        div.onclick = () => openSchoolDetail(name);
+        div.innerHTML = `
+            <h3>${escapeHtml(s.name)}</h3>
+            <div class="school-meta">📍 ${escapeHtml(s.district||'Unknown District')}</div>
+            <div class="school-meta">👥 ${s.count} Students</div>
+            <div class="school-meta">📞 ${escapeHtml(s.phone||'N/A')}</div>
+        `;
+        grid.appendChild(div);
+    });
 }
 
-document.getElementById('refreshBtn').addEventListener('click', loadData);
-schoolFilter.addEventListener('change', filterAndRender);
-
-function filterAndRender(){
-    const val = schoolFilter.value;
-    const data = (val==='all') ? allStudents : allStudents.filter(s=>s.schoolName===val);
-    updateHMInfo(val, data);
-    renderTable(data);
+/* ---------- Navigation ---------- */
+function showDashboard(){
+    document.getElementById('detailView').classList.add('hidden');
+    document.getElementById('dashboardView').classList.remove('hidden');
+    window.scrollTo(0,0);
 }
 
-function updateHMInfo(schoolName, data){
-    if(schoolName==='all' || data.length===0){ hmInfoPanel.style.display='none'; return; }
-    const ref = data.find(s => s.hmPhone || s.hmSignature);
-    if(ref){
-        hmInfoPanel.style.display='flex';
-        hmPhoneDisplay.textContent = ref.hmPhone ? `📞 ${ref.hmPhone}` : '';
-        if(ref.hmSignature){
-            hmSignDisplay.src = ref.hmSignature; hmSignDisplay.style.display='block';
-            hmSignDownload.href = ref.hmSignature; hmSignDownload.download = `${schoolName}_HM_Sign.png`; hmSignDownload.style.display='inline';
-        } else {
-            hmSignDisplay.style.display='none'; hmSignDownload.style.display='none';
-        }
-    } else { hmInfoPanel.style.display='none'; }
-}
-
-function renderTable(data){
-  tableBody.innerHTML = ''; selectAllCheckbox.checked = false; updateGenerateCount();
-  if(!data||data.length===0){ tableBody.innerHTML = '<tr><td colspan="11" style="text-align:center">No data found.</td></tr>'; return; }
-  
-  data.forEach((s, idx)=>{
-    const tr=document.createElement('tr'); 
-    const photoSrc = s.photoBase64 || 'https://placehold.co/64?text=No+Photo';
-    tr.innerHTML = `
-      <td class="checkbox-col"><input type="checkbox" class="student-select" value="${s.id}"></td>
-      <td class="sn-col">${idx+1}</td>
-      <td><img class="thumb" src="${photoSrc}" onclick="window.open('${photoSrc}')"></td>
-      <td>${escapeHtml(s.name||'')}</td><td>${escapeHtml(s.class||'')}</td><td>${escapeHtml(s.roll||'')}</td>
-      <td>${escapeHtml(s.dob||'')}</td><td>${escapeHtml(s.bloodGroup||'-')}</td><td>${escapeHtml(s.phone||'-')}</td>
-      <td>${escapeHtml(s.schoolName||'')}</td>
-      <td>
-        <button onclick="openEdit('${s.id}')" style="background:#007bff; padding:5px 10px; font-size:12px; margin-right:5px;">✎ Edit</button>
-        <button onclick="confirmDelete('${s.id}','${escapeHtml(s.name)}')" style="background:#dc3545; padding:5px 10px; font-size:12px;">🗑</button>
-      </td>`;
-    tableBody.appendChild(tr);
-  });
-  
-  document.querySelectorAll('.student-select').forEach(cb => cb.addEventListener('change', updateGenerateCount));
-}
-
-selectAllCheckbox.addEventListener('change', (e)=>{
-    document.querySelectorAll('.student-select').forEach(cb => cb.checked = e.target.checked);
-    updateGenerateCount();
-});
-
-function updateGenerateCount(){
-    const count = document.querySelectorAll('.student-select:checked').length;
-    if(count > 0 && window.assets.template && window.assets.font && window.assets.aiModel !== 'pending'){
-        generateBtn.disabled = false;
-        generateBtn.innerHTML = `Generate <strong>${count}</strong> Selected ID Cards`;
+function openSchoolDetail(schoolName){
+    const sData = schoolsMap[schoolName];
+    currentSchoolStudents = allStudents.filter(s => s.schoolName === schoolName);
+    
+    // Populate Header
+    document.getElementById('viewSchoolName').textContent = sData.name;
+    document.getElementById('viewBlock').textContent = sData.block ? `Block: ${sData.block},` : '';
+    document.getElementById('viewDistrict').textContent = sData.district ? `Dist: ${sData.district}` : '';
+    document.getElementById('viewPin').textContent = sData.pin ? `-${sData.pin}` : '';
+    document.getElementById('viewContact').textContent = sData.phone ? `📞 Contact: ${sData.phone}` : '';
+    
+    const signImg = document.getElementById('viewHmSign');
+    const dlBtn = document.getElementById('downloadSignBtn');
+    
+    if(sData.signature){
+        signImg.src = sData.signature;
+        signImg.style.display = 'block';
+        dlBtn.href = sData.signature;
+        dlBtn.style.display = 'inline-block';
     } else {
-        generateBtn.disabled = true;
-        if(window.assets.aiModel === 'pending') generateBtn.textContent = "Waiting for AI Model...";
-        else if(!window.assets.template) generateBtn.textContent = "Upload Template First";
-        else if(count === 0) generateBtn.textContent = "Select Students First";
+        signImg.style.display = 'none';
+        dlBtn.style.display = 'none';
+    }
+
+    // Render Table
+    renderStudentTable();
+    
+    // Switch View
+    document.getElementById('dashboardView').classList.add('hidden');
+    document.getElementById('detailView').classList.remove('hidden');
+    window.scrollTo(0,0);
+    updateStatus();
+}
+
+/* ---------- Table Logic ---------- */
+function renderStudentTable(){
+    const tbody = document.querySelector('#studentTable tbody');
+    tbody.innerHTML = '';
+    document.getElementById('selectAll').checked = false;
+
+    currentSchoolStudents.forEach((s, idx) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><input type="checkbox" class="student-select" value="${s.id}"></td>
+            <td>${idx+1}</td>
+            <td><img class="thumb" src="${s.photoBase64 || 'https://placehold.co/40'}" onclick="window.open(this.src)"></td>
+            <td>${escapeHtml(s.name)}</td>
+            <td>${escapeHtml(s.class)}</td>
+            <td>${escapeHtml(s.roll)}</td>
+            <td>${escapeHtml(s.dob)}</td>
+            <td>${escapeHtml(s.bloodGroup)}</td>
+            <td>${escapeHtml(s.mobile || s.phone || '')}</td>
+            <td>
+                <button class="btn btn-primary" style="padding:4px 8px; font-size:12px;" onclick="editStudent('${s.id}')">✎</button>
+                <button class="btn btn-danger" style="padding:4px 8px; font-size:12px;" onclick="deleteStudent('${s.id}')">🗑</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+    
+    // Listeners
+    document.querySelectorAll('.student-select').forEach(cb => cb.addEventListener('change', updateSelection));
+}
+
+document.getElementById('selectAll').onchange = (e) => {
+    document.querySelectorAll('.student-select').forEach(cb => cb.checked = e.target.checked);
+    updateSelection();
+};
+
+function updateSelection(){
+    const count = document.querySelectorAll('.student-select:checked').length;
+    document.getElementById('selectionCount').textContent = `${count} students selected`;
+    
+    const btn = document.getElementById('generateBtn');
+    if(count > 0 && window.assets.template && window.assets.font && window.assets.aiModel !== 'pending'){
+        btn.disabled = false;
+        btn.textContent = `🖨 Generate ${count} ID Cards`;
+    } else {
+        btn.disabled = true;
+        if(!window.assets.template) btn.textContent = "Upload Template First";
+        else if(!window.assets.font) btn.textContent = "Upload Font First";
+        else if(count === 0) btn.textContent = "Select Students First";
     }
 }
 
-/* ---------- AI Engine (Standard Loader) ---------- */
+/* ---------- AI & Generator Setup (Same as before) ---------- */
 let FaceDetector=null, FilesetResolver=null, faceDetector=null;
 async function initializeFaceDetector(){
   window.assets.aiModel = 'pending'; updateStatus();
@@ -313,29 +382,23 @@ async function initializeFaceDetector(){
     FaceDetector = mod.FaceDetector; FilesetResolver = mod.FilesetResolver;
     const fileset = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
     faceDetector = await FaceDetector.createFromOptions(fileset, { baseOptions:{ modelAssetPath:"https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite", delegate:"GPU" }, minDetectionConfidence:0.5, runningMode:"IMAGE" });
-    window.assets.aiModel = 'loaded'; updateStatus(); console.log('AI Loaded');
-  }catch(err){ console.warn('AI failed', err); window.assets.aiModel = 'failed'; updateStatus(); }
+    window.assets.aiModel = 'loaded'; updateStatus();
+  }catch(err){ window.assets.aiModel = 'failed'; updateStatus(); }
 }
 initializeFaceDetector();
-
-const cardCanvas = document.getElementById('cardCanvas');
-const ctx = cardCanvas.getContext('2d');
 
 function updateStatus(){ 
     const t = window.assets.template ? '✅ Template' : '❌ Template'; 
     const f = window.assets.font ? '✅ Font' : '❌ Font'; 
-    let ai='⏳ AI Model...'; 
-    if(window.assets.aiModel==='loaded') ai='✅ AI Model'; 
-    if(window.assets.aiModel==='failed') ai='⚠️ AI (Fallback)'; 
-    generatorStatus.textContent = `Status: ${t}, ${f}, ${ai}`; 
-    updateGenerateCount();
+    const ai = window.assets.aiModel === 'loaded' ? '✅ AI' : '⏳ AI...';
+    document.getElementById('generatorStatus').textContent = `Status: ${t}, ${f}, ${ai}`; 
+    updateSelection();
 }
-setInterval(updateStatus, 800);
 
 document.getElementById('templateInput').onchange = e => {
     const f=e.target.files[0]; if(!f) return;
     const img=new Image(); img.src=URL.createObjectURL(f);
-    img.onload=()=>{ window.assets.template=img; window.assets.templateWidth=img.width; updateStatus(); }
+    img.onload=()=>{ window.assets.template=img; updateStatus(); }
 }
 document.getElementById('fontInput').onchange = async e => {
     const f=e.target.files[0]; if(!f) return;
@@ -345,7 +408,10 @@ document.getElementById('fontInput').onchange = async e => {
     updateStatus();
 }
 
-/* ---------- Generation Logic (Old Crop + Centered A4) ---------- */
+/* ---------- Generator Logic ---------- */
+const cardCanvas = document.getElementById('cardCanvas');
+const ctx = cardCanvas.getContext('2d');
+
 async function generateCardImage(student){
   cardCanvas.width = CARD_W; cardCanvas.height = CARD_H;
   ctx.clearRect(0,0,CARD_W,CARD_H);
@@ -353,13 +419,16 @@ async function generateCardImage(student){
   if(window.assets.template) ctx.drawImage(window.assets.template, 0, 0, CARD_W, CARD_H);
   else { ctx.fillStyle='white'; ctx.fillRect(0,0,CARD_W,CARD_H); }
   
+  // Coordinates based on previous context
   const ORIG_PX = 222, ORIG_PY = 250, ORIG_PW = 187, ORIG_PH = 225;
-  const tplW = window.assets.templateWidth || CARD_W;
+  const tplW = window.assets.template.width || CARD_W;
   const scale = CARD_W / tplW;
+  
   const px = Math.round(ORIG_PX * scale), py = Math.round(ORIG_PY * scale);
   const pw = Math.round(ORIG_PW * scale), ph = Math.round(ORIG_PH * scale);
   const border = Math.max(2, Math.round(3 * scale));
 
+  // Black BG for photo
   ctx.fillStyle = '#000'; ctx.fillRect(px - border, py - border, pw + border*2, ph + border*2);
 
   const photo = new Image(); photo.crossOrigin = "Anonymous";
@@ -368,40 +437,30 @@ async function generateCardImage(student){
       await new Promise(r => { photo.onload=r; photo.onerror=r; });
   }
 
+  // AI Face Crop
   let sx=0, sy=0, sW=photo.width||1, sH=photo.height||1;
-  
   if(photo.width && faceDetector && window.assets.aiModel === 'loaded'){
       try {
           const det = faceDetector.detect(photo);
           if(det && det.detections && det.detections.length>0){
               const bbox = det.detections[0].boundingBox;
-              const img_w = photo.width, img_h = photo.height;
-              let x1=bbox.originX, y1=bbox.originY, x2=bbox.originX + bbox.width, y2=bbox.originY + bbox.height;
-              const bw = x2-x1, bh = y2-y1;
-              const add_w = parseInt(bw * 0.6); 
-              const add_h = parseInt(bh * 1.4); 
-              const new_x1 = Math.max(0, x1 - add_w/2);
-              const new_y1 = Math.max(0, y1 - add_h/2);
-              const new_x2 = Math.min(img_w, x2 + add_w/2);
-              const new_y2 = Math.min(img_h, y2 + add_h/2);
-              sx = new_x1; sy = new_y1; sW = new_x2 - new_x1; sH = new_y2 - new_y1;
-          } else {
-             const targetRatio = pw / ph; const srcRatio = sW / sH;
-             if(srcRatio > targetRatio){ sW = sH * targetRatio; sx=(photo.width - sW)/2; } 
-             else { sH = sW / targetRatio; sy=(photo.height - sH)/2; }
+              const add_w = parseInt(bbox.width * 0.6); 
+              const add_h = parseInt(bbox.height * 1.4); 
+              sx = Math.max(0, bbox.originX - add_w/2);
+              sy = Math.max(0, bbox.originY - add_h/2);
+              sW = Math.min(photo.width - sx, bbox.width + add_w);
+              sH = Math.min(photo.height - sy, bbox.height + add_h);
           }
       } catch(e){}
-  } else {
-      const targetRatio = pw / ph; const srcRatio = sW / sH;
-      if(srcRatio > targetRatio){ sW = sH * targetRatio; sx=(photo.width - sW)/2; } 
-      else { sH = sW / targetRatio; sy=(photo.height - sH)/2; }
   }
   
   if(photo.width) ctx.drawImage(photo, sx, sy, sW, sH, px, py, pw, ph);
   
+  // Text Drawing
   ctx.fillStyle = '#000'; ctx.textBaseline = 'alphabetic';
   ctx.font = `${Math.round(38*scale)}px OdiaFont`;
   const tx = Math.round(227*scale);
+  
   let dob = student.dob || '';
   try{ const [y,m,d] = dob.split('-'); if(y&&m&&d) dob = `${d}/${m}/${y}`; } catch(e){}
   
@@ -409,7 +468,8 @@ async function generateCardImage(student){
   ctx.fillText(student.class||'', tx, Math.round((575+38)*scale));
   ctx.fillText(toOdiaDigits(dob), tx, Math.round((647+38)*scale));
   ctx.fillText(toOdiaDigits(student.roll), tx, Math.round((718+38)*scale));
-  ctx.fillText(toOdiaDigits(student.phone), tx, Math.round((789+38)*scale));
+  const phNum = student.mobile || student.phone || '';
+  ctx.fillText(toOdiaDigits(phNum), tx, Math.round((789+38)*scale));
   
   if(student.bloodGroup){
       ctx.fillStyle = 'white'; ctx.font = `${Math.round(23*scale)}px OdiaFont`;
@@ -418,177 +478,132 @@ async function generateCardImage(student){
   return await new Promise(r => cardCanvas.toBlob(r, 'image/png'));
 }
 
-generateBtn.onclick = async () => {
+document.getElementById('generateBtn').onclick = async () => {
     const checkboxes = document.querySelectorAll('.student-select:checked');
-    if(checkboxes.length === 0) return alert("Select students first");
+    if(checkboxes.length === 0) return;
     
-    generateBtn.disabled = true; generatorStatus.textContent = "Preparing...";
+    const btn = document.getElementById('generateBtn');
+    btn.disabled = true; btn.textContent = "Processing...";
     
     try {
         const selectedIds = Array.from(checkboxes).map(c => c.value);
-        const dataToGen = allStudents.filter(s => selectedIds.includes(s.id.toString()));
+        const dataToGen = currentSchoolStudents.filter(s => selectedIds.includes(s.id.toString()));
         
         const zip = new JSZip();
         const singleFolder = zip.folder('cards_png');
-        
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF({ unit:'px', format:[CARD_W, CARD_H] });
         
-        let counter = 0;
         let singleImages = [];
         
-        for(const st of dataToGen){
-            counter++; generatorStatus.textContent = `Generating ${counter}/${dataToGen.length}...`;
-            const blob = await generateCardImage(st);
-            const fname = `${(st.name||'st').replace(/\s/g,'_')}_${st.roll}.png`;
-            const buf = await blob.arrayBuffer();
-            singleFolder.file(fname, buf);
-            
+        for(let i=0; i<dataToGen.length; i++){
+            btn.textContent = `Generating ${i+1}/${dataToGen.length}...`;
+            const blob = await generateCardImage(dataToGen[i]);
             const img = new Image(); img.src = URL.createObjectURL(blob);
             await new Promise(r => img.onload=r);
-            if(counter > 1) pdf.addPage([CARD_W, CARD_H], 'portrait');
+            
+            singleFolder.file(`${dataToGen[i].name}_${dataToGen[i].roll}.png`, blob);
+            
+            if(i > 0) pdf.addPage([CARD_W, CARD_H], 'portrait');
             pdf.addImage(img, 'PNG', 0, 0, CARD_W, CARD_H);
-            
-            pdf.saveGraphicsState();
-            pdf.setGState(new pdf.GState({opacity: 0.1}));
-            pdf.setFontSize(20); pdf.setTextColor(0,0,0);
-            const wm = "AN DIGITAL";
-            for(let i=0; i<4; i++) for(let j=0; j<6; j++) pdf.text(wm, i*150, j*150, {angle: 45});
-            pdf.restoreGraphicsState();
-            
-            singleImages.push({blob: blob, img: img});
+            singleImages.push(img);
         }
         
-        generatorStatus.textContent = "Combined PDF...";
-        zip.file('All_ID_Cards.pdf', pdf.output('arraybuffer'));
-        
-        generatorStatus.textContent = "A4 Sheets...";
+        btn.textContent = "Creating A4 Sheets...";
+        // A4 Layout logic (5x2 grid centered)
         const pageCanvas = document.createElement('canvas'); pageCanvas.width=A4_W; pageCanvas.height=A4_H;
         const pctx = pageCanvas.getContext('2d');
-        
-        // --- NEW CENTERED A4 LAYOUT (40px Gap) ---
-        const GAP_X = 40; const GAP_Y = 150; 
+        const GAP_X = 40, GAP_Y = 150;
         const totalGridW = (5 * CARD_W) + (4 * GAP_X);
         const totalGridH = (2 * CARD_H) + (1 * GAP_Y);
         const startX = (A4_W - totalGridW) / 2;
         const startY = (A4_H - totalGridH) / 2;
-        
+
         for(let i=0; i<singleImages.length; i+=10){
             pctx.fillStyle='white'; pctx.fillRect(0,0,A4_W,A4_H);
             const chunk = singleImages.slice(i, i+10);
-            chunk.forEach((item, idx) => {
+            chunk.forEach((img, idx) => {
                 const col = idx % 5; const row = Math.floor(idx / 5);
                 const x = startX + col * (CARD_W + GAP_X);
                 const y = startY + row * (CARD_H + GAP_Y);
-                pctx.drawImage(item.img, x, y);
-                pctx.strokeStyle='#ddd'; pctx.lineWidth=1; pctx.strokeRect(x,y,CARD_W,CARD_H); // Cut lines
+                pctx.drawImage(img, x, y);
+                pctx.strokeStyle='#ccc'; pctx.lineWidth=2; pctx.strokeRect(x,y,CARD_W,CARD_H);
             });
             const pBlob = await new Promise(r => pageCanvas.toBlob(r, 'image/jpeg', 0.9));
-            zip.file(`A4_Print_Page_${Math.floor(i/10)+1}.jpg`, pBlob);
+            zip.file(`Print_Sheet_${Math.floor(i/10)+1}.jpg`, pBlob);
         }
-        
-        generatorStatus.textContent = "Zipping...";
+
+        btn.textContent = "Downloading...";
         const content = await zip.generateAsync({type:'blob'});
         const link = document.createElement('a'); link.href = URL.createObjectURL(content);
-        link.download = `Cards_${Date.now()}.zip`; link.click();
+        link.download = `${document.getElementById('viewSchoolName').textContent}_Cards.zip`; link.click();
         
-        generatorStatus.textContent = "Done! Ready.";
-        
-    } catch(e){ console.error(e); alert('Error: '+e.message); }
-    generateBtn.disabled = false;
-}
-
-/* ---------- Backup Logic ---------- */
-document.getElementById('downloadZipBtn').onclick = async () => {
-    alert("Starting backup...");
-    const val = schoolFilter.value;
-    const data = (val==='all') ? allStudents : allStudents.filter(s=>s.schoolName===val);
-    const zip = new JSZip();
-    data.forEach(s => { if(s.photoBase64) zip.file(`photos/${s.newPhotoName}`, s.photoBase64.split(',')[1], {base64:true}); });
-    const excelData = data.map(s => {
-        let dob = s.dob||''; try{ const [y,m,d] = dob.split('-'); if(y&&m&&d) dob = `${d}/${m}/${y}`; } catch(e){}
-        return { 
-            name: s.name, class: s.class, dob: toOdiaDigits(dob), 
-            roll: toOdiaDigits(s.roll), phone: toOdiaDigits(s.phone), 
-            school: s.schoolName, hmPhone: s.hmPhone, photo: s.newPhotoName 
-        };
-    });
-    const ws = XLSX.utils.json_to_sheet(excelData); const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Students");
-    zip.file('database.xlsx', XLSX.write(wb, {type:'array', bookType:'xlsx'}));
+    } catch(e){ alert("Error: "+e.message); }
     
+    updateSelection(); // Reset Button Text
+};
+
+/* ---------- Backup ---------- */
+document.getElementById('downloadRawBtn').onclick = async () => {
+    const zip = new JSZip();
+    const allData = allStudents.map(s => ({
+        name: s.name, class: s.class, roll: s.roll, dob: s.dob, mobile: s.mobile,
+        school: s.schoolName, block: s.block, district: s.district
+    }));
+    const ws = XLSX.utils.json_to_sheet(allData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Students");
+    zip.file('Database.xlsx', XLSX.write(wb, {type:'array', bookType:'xlsx'}));
     const blob = await zip.generateAsync({type:'blob'});
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download='Backup.zip'; a.click();
+};
+
+/* ---------- Edit/Delete ---------- */
+function deleteStudent(id){
+    if(!confirm("Delete this student permanently?")) return;
+    db.collection('students').doc(id).delete().then(() => {
+        allStudents = allStudents.filter(s => s.id !== id);
+        currentSchoolStudents = currentSchoolStudents.filter(s => s.id !== id);
+        renderStudentTable();
+    });
 }
 
-/* ---------- EDIT & DELETE HANDLERS ---------- */
-window.confirmDelete = function(id, name){
-    idToDelete = id; document.getElementById('confirmText').textContent = `Delete ${name}?`;
-    document.getElementById('confirmModal').style.display='flex';
-}
-document.getElementById('confirmYesBtn').onclick = () => {
-    if(idToDelete){ db.collection('students').doc(idToDelete.toString()).delete().then(()=>{ allStudents=allStudents.filter(s=>s.id.toString()!==idToDelete.toString()); filterAndRender(); document.getElementById('confirmModal').style.display='none'; }); }
-}
-document.getElementById('confirmNoBtn').onclick = () => document.getElementById('confirmModal').style.display='none';
-document.getElementById('deleteAllBtn').onclick = () => document.getElementById('deleteAllModal').style.display='flex';
-document.getElementById('deleteAllNoBtn').onclick = () => document.getElementById('deleteAllModal').style.display='none';
-document.getElementById('deleteAllYesBtn').onclick = async () => { alert("Disabled for safety"); document.getElementById('deleteAllModal').style.display='none'; }
-
-// EDIT LOGIC
-window.openEdit = function(id) {
-    const s = allStudents.find(x => x.id.toString() === id.toString());
-    if(!s) return alert("Student not found");
-
+function editStudent(id){
+    const s = currentSchoolStudents.find(x => x.id === id);
+    if(!s) return;
     document.getElementById('editId').value = s.id;
-    document.getElementById('editName').value = s.name || '';
-    document.getElementById('editClass').value = s.class || '';
-    document.getElementById('editRoll').value = s.roll || '';
-    document.getElementById('editDob').value = s.dob || '';
-    document.getElementById('editBlood').value = s.bloodGroup || '';
-    document.getElementById('editPhone').value = s.phone || '';
-
+    document.getElementById('editName').value = s.name;
+    document.getElementById('editClass').value = s.class;
+    document.getElementById('editRoll').value = s.roll;
+    document.getElementById('editDob').value = s.dob;
+    document.getElementById('editBlood').value = s.bloodGroup;
+    document.getElementById('editPhone').value = s.mobile || s.phone || '';
     document.getElementById('editModal').style.display = 'flex';
-}
-
-document.getElementById('cancelEditBtn').onclick = () => {
-    document.getElementById('editModal').style.display = 'none';
 }
 
 document.getElementById('saveEditBtn').onclick = async () => {
     const id = document.getElementById('editId').value;
-    const btn = document.getElementById('saveEditBtn');
-    
-    btn.textContent = "Saving...";
-    btn.disabled = true;
-
-    const updatedData = {
+    const update = {
         name: document.getElementById('editName').value,
         class: document.getElementById('editClass').value,
         roll: document.getElementById('editRoll').value,
         dob: document.getElementById('editDob').value,
         bloodGroup: document.getElementById('editBlood').value,
-        phone: document.getElementById('editPhone').value
+        mobile: document.getElementById('editPhone').value
     };
-
-    try {
-        await db.collection('students').doc(id).update(updatedData);
-        
-        // Update local array immediately
-        const idx = allStudents.findIndex(x => x.id.toString() === id.toString());
-        if(idx !== -1) {
-            allStudents[idx] = { ...allStudents[idx], ...updatedData };
-        }
-        
-        filterAndRender();
-        document.getElementById('editModal').style.display = 'none';
-        
-    } catch(e) {
-        alert("Error saving: " + e.message);
-    } finally {
-        btn.textContent = "Save Changes";
-        btn.disabled = false;
-    }
-}
+    
+    await db.collection('students').doc(id).update(update);
+    
+    // Update local data
+    const idx = allStudents.findIndex(x => x.id == id);
+    if(idx !== -1) allStudents[idx] = { ...allStudents[idx], ...update };
+    
+    const idx2 = currentSchoolStudents.findIndex(x => x.id == id);
+    if(idx2 !== -1) currentSchoolStudents[idx2] = { ...currentSchoolStudents[idx2], ...update };
+    
+    document.getElementById('editModal').style.display = 'none';
+    renderStudentTable();
+};
 </script>
 </body>
 </html>
