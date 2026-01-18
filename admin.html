@@ -151,10 +151,22 @@ const CARD_W = 638;  // 54mm @ 300dpi
 const CARD_H = 1012; // 85.6mm @ 300dpi
 const A4_W = 3508, A4_H = 2480;
 
-// Coordinate Configuration (User Provided)
-const SCHOOL_NAME_POS = { x: 121, y: 55, size: 45 }; // Approx 7 bold relative to DPI
-const SCHOOL_ADDR_POS = { x: 198, y: 94, size: 30 }; // Approx 9 regular relative to DPI
-const SIGN_POS = { x: 434, y: 881, w: 180, h: 60 };  // Adjusted width/height for constraints
+// Coordinate Configuration
+// School Name Area: 119 to 611 px. Center = 365px.
+const HEADER_MIN_X = 119;
+const HEADER_MAX_X = 611;
+const HEADER_CENTER_X = 365;
+const HEADER_Y = 57;
+
+// Address Area: 198, 94
+const ADDR_X = 198;
+const ADDR_Y = 94;
+
+// Signature: 434, 881
+const SIGN_X = 434;
+const SIGN_Y = 881;
+const SIGN_MAX_W = 180;
+const SIGN_MAX_H = 60;
 
 /* ---------- HELPERS ---------- */
 window.odiaDigits = ['୦','୧','୨','୩','୪','୫','୬','୭','୮','୯'];
@@ -167,9 +179,8 @@ let allStudents = [];
 let schoolsMap = {};
 let currentSchoolStudents = [];
 window.assets = { template: null, font: null, aiModel: 'pending', mode: 'manual' }; 
-// mode: 'manual' (uploaded) or 'auto' (background.png)
 
-/* ---------- ASSET LOADER ---------- */
+/* ---------- AUTO-LOAD ASSETS ---------- */
 async function loadAutoAssets() {
     try {
         const resp = await fetch('OdiaFont.ttf');
@@ -191,7 +202,7 @@ async function loadAutoAssets() {
             img.src = URL.createObjectURL(blob);
             img.onload = () => {
                 window.assets.template = img;
-                window.assets.mode = 'auto'; // AUTO MODE
+                window.assets.mode = 'auto';
                 document.getElementById('tplStatus').className = 'status-badge status-ok';
                 document.getElementById('tplStatus').textContent = 'Auto-Loaded';
                 updateSelection();
@@ -216,12 +227,12 @@ try{
   db = firebase.firestore();
   loadData();
   loadAutoAssets();
-} catch(e){ alert('Firebase Error: '+e.message); }
+} catch(e){ console.error(e); alert('Firebase error: '+e.message); }
 
 /* ---------- DATA LOGIC ---------- */
 function loadData(){
     const grid = document.getElementById('schoolGrid');
-    grid.innerHTML = '<p>Loading...</p>';
+    grid.innerHTML = '<p>Loading data...</p>';
     db.collection('students').get().then(qs => {
         allStudents = []; schoolsMap = {};
         qs.forEach(doc => {
@@ -238,7 +249,6 @@ function loadData(){
                 }
                 schoolsMap[d.schoolName].count++;
                 const sm = schoolsMap[d.schoolName];
-                // Update if later records have better data
                 if(!sm.signature && d.hmSignature) sm.signature = d.hmSignature;
                 if(!sm.block && d.block) sm.block = d.block;
             }
@@ -308,7 +318,6 @@ function updateSelection(){
     document.getElementById('selectionCount').textContent = `${n} selected`;
     const btn = document.getElementById('generateBtn');
     
-    // AI optional check
     if(n > 0 && window.assets.font && window.assets.template) {
         btn.disabled = false;
         btn.innerHTML = `🖨 Generate <b>${n}</b> Cards`;
@@ -317,7 +326,7 @@ function updateSelection(){
     }
 }
 
-/* ---------- MANUAL UPLOAD HANDLERS ---------- */
+/* ---------- MANUAL UPLOAD ---------- */
 document.getElementById('fontInput').onchange = async e => {
     const f = e.target.files[0]; if(!f) return;
     const buf = await f.arrayBuffer();
@@ -333,7 +342,7 @@ document.getElementById('templateInput').onchange = e => {
     const img = new Image(); img.src = URL.createObjectURL(f);
     img.onload = () => {
         window.assets.template = img;
-        window.assets.mode = 'manual'; // SWITCH TO MANUAL MODE
+        window.assets.mode = 'manual'; // SWITCH TO MANUAL
         document.getElementById('tplStatus').className = 'status-badge status-ok';
         document.getElementById('tplStatus').textContent = 'Manual Load';
         updateSelection();
@@ -378,11 +387,10 @@ function makeWhiteTransparent(img) {
     cx.drawImage(img, 0, 0);
     const imgData = cx.getImageData(0,0, c.width, c.height);
     const data = imgData.data;
-    // Loop pixels. If light > 200, make transparent
     for(let i=0; i<data.length; i+=4) {
         const r = data[i], g = data[i+1], b = data[i+2];
         if(r > 200 && g > 200 && b > 200) {
-            data[i+3] = 0; // Alpha 0
+            data[i+3] = 0; // Transparent
         }
     }
     cx.putImageData(imgData, 0, 0);
@@ -404,30 +412,42 @@ async function drawCard(s) {
     if(window.assets.mode === 'auto') {
         const sm = schoolsMap[s.schoolName];
         
-        // School Name
+        // School Name: Auto-scale to fit between 119px and 611px (Width = 492px)
+        const MAX_W = HEADER_MAX_X - HEADER_MIN_X;
         ctx.fillStyle = '#FFFFFF'; 
-        ctx.textAlign = 'left'; // User specified coordinate likely implies left aligned
-        ctx.font = `bold ${SCHOOL_NAME_POS.size}px OdiaFont`;
-        // Coordinates provided: 121, 55
-        ctx.fillText(s.schoolName, SCHOOL_NAME_POS.x, SCHOOL_NAME_POS.y); 
+        ctx.textAlign = 'center'; 
+        let fontSize = 45; // Starting Size
+        ctx.font = `bold ${fontSize}px OdiaFont`;
         
-        // Address
-        ctx.font = `${SCHOOL_ADDR_POS.size}px OdiaFont`;
-        // Coordinates: 198, 94. Combining Block, District, Pin
+        // Loop to shrink font if text is too wide
+        while (ctx.measureText(s.schoolName).width > MAX_W && fontSize > 10) {
+            fontSize--;
+            ctx.font = `bold ${fontSize}px OdiaFont`;
+        }
+        ctx.fillText(s.schoolName, HEADER_CENTER_X, HEADER_Y);
+        
+        // Address (Block, District, Pin) at 198, 94
+        ctx.textAlign = 'left';
+        ctx.font = '32px OdiaFont'; 
         const addrText = `${sm.block}, ${sm.district} - ${toOdiaDigits(sm.pin)}`;
-        ctx.fillText(addrText, SCHOOL_ADDR_POS.x, SCHOOL_ADDR_POS.y);
+        ctx.fillText(addrText, ADDR_X, ADDR_Y);
 
-        // Signature (with transparent BG)
+        // Signature at 434, 881 (with BG removal)
         if(sm && sm.signature) {
             const signImg = new Image(); signImg.src = sm.signature;
             await new Promise(r => signImg.onload=r);
             const cleanSign = makeWhiteTransparent(signImg);
-            // Coordinates: 434, 881
-            ctx.drawImage(cleanSign, SIGN_POS.x, SIGN_POS.y, SIGN_POS.w, SIGN_POS.h);
+            
+            // Aspect ratio scaling
+            const ratio = Math.min(SIGN_MAX_W / cleanSign.width, SIGN_MAX_H / cleanSign.height);
+            const sw = cleanSign.width * ratio;
+            const sh = cleanSign.height * ratio;
+            
+            ctx.drawImage(cleanSign, SIGN_X, SIGN_Y, sw, sh);
         }
     }
 
-    // 3. Photo & Text (Standard Placement)
+    // 3. Photo & Box (Standard Coordinates)
     const tplW = window.assets.template.width || CARD_W;
     const scale = CARD_W / tplW;
     const ORIG_PX = 222, ORIG_PY = 250, ORIG_PW = 187, ORIG_PH = 225;
@@ -459,7 +479,7 @@ async function drawCard(s) {
         ctx.drawImage(photo, sx, sy, sw, sh, px, py, pw, ph);
     }
 
-    // Student Text (Standard Placement)
+    // 4. Student Text
     ctx.fillStyle = '#000'; ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
     ctx.font = `${Math.round(38*scale)}px OdiaFont`;
     const tx = Math.round(227*scale);
@@ -507,15 +527,12 @@ document.getElementById('generateBtn').onclick = async () => {
         await new Promise(r => imgObj.onload=r);
         imgs.push(imgObj);
 
-        // Print PDF
         if(i>0) printPdf.addPage([CARD_W, CARD_H], 'portrait');
         printPdf.addImage(imgObj, 'PNG', 0, 0, CARD_W, CARD_H);
 
-        // Verify PDF
         if(i>0) verifyPdf.addPage([CARD_W, CARD_H], 'portrait');
         verifyPdf.addImage(imgObj, 'PNG', 0, 0, CARD_W, CARD_H);
         
-        // Watermark
         verifyPdf.saveGraphicsState();
         verifyPdf.setGState(new verifyPdf.GState({opacity: 0.3}));
         verifyPdf.setTextColor(255, 0, 0); 
