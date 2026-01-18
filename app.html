@@ -25,12 +25,6 @@
         .btn-danger { background: #dc3545; }
         .btn-outline { background: transparent; border: 1px solid #0056b3; color: #0056b3; }
         
-        /* School Grid */
-        .school-list { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 15px; }
-        .school-item { background: white; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #eee; position: relative; cursor: pointer; }
-        .school-item:hover { border-color: #0056b3; background: #f0f8ff; }
-        .school-del { position: absolute; top: 15px; right: 15px; background: #ffebeb; color: red; border-radius: 50%; width: 25px; height: 25px; display: flex; align-items: center; justify-content: center; font-size: 14px; z-index: 2; }
-
         /* Student List Item */
         .student-item { display: flex; align-items: center; background: white; padding: 10px; border-radius: 8px; margin-bottom: 8px; border: 1px solid #eee; }
         .serial-no { font-weight: bold; color: #0056b3; margin-right: 10px; min-width: 20px; }
@@ -60,7 +54,7 @@
 
     <div class="container">
         
-        <div id="schoolSection">
+        <div id="schoolSection" class="hidden">
             <h2 style="text-align:center; color:#0056b3;">School Registration</h2>
             
             <div class="card" id="addSchoolCard">
@@ -80,8 +74,6 @@
 
                 <button class="btn btn-primary" id="addSchoolBtn">Submit</button>
             </div>
-
-            <div id="schoolListDisplay" class="school-list"></div>
         </div>
 
         <div id="entrySection" class="hidden">
@@ -90,10 +82,7 @@
                     <h3 id="currentSchoolHeader" style="margin:0; font-size: 16px;">School Name</h3>
                     <small id="currentSchoolSubHeader" style="color:#666; font-size:11px;">District</small>
                 </div>
-                <div style="display: flex; gap: 5px;">
-                    <button class="btn btn-primary" onclick="openEditSchoolModal()" style="width:auto; padding: 6px 10px; font-size:12px; margin:0;">Edit School</button>
-                    <button class="btn btn-outline" onclick="exitSchool()" style="width:auto; padding: 6px 10px; font-size:12px; margin:0;">Exit</button>
-                </div>
+                <button class="btn btn-primary" onclick="openEditSchoolModal()" style="width:auto; padding: 6px 15px; font-size:12px; margin:0;">Edit School</button>
             </div>
 
             <div class="card">
@@ -163,9 +152,11 @@
             <label>Update Signature (Optional)</label>
             <input type="file" id="editSchoolSignInput" accept="image/*">
             
-            <div style="display:flex; gap:10px; margin-top:15px;">
+            <div style="display:flex; gap:10px; margin-top:15px; flex-direction: column;">
                 <button class="btn btn-success" id="saveSchoolEditBtn">Save Changes</button>
-                <button class="btn btn-danger" onclick="document.getElementById('editSchoolModal').style.display='none'">Cancel</button>
+                <button class="btn btn-outline" onclick="document.getElementById('editSchoolModal').style.display='none'">Cancel</button>
+                <hr style="width:100%; border:0; border-top:1px solid #eee;">
+                <button class="btn btn-danger" onclick="hardResetApp()">Delete School Data (Reset App)</button>
             </div>
         </div>
     </div>
@@ -197,7 +188,7 @@
         let db, currentSchool = null, currentSchoolData = null, students = [], currentPhotoBlob = null;
         
         // DB INIT
-        const req = indexedDB.open('SchoolDataApp', 5); // Bumped version to 5 for phone field
+        const req = indexedDB.open('SchoolDataApp', 5);
         req.onupgradeneeded = e => {
             db = e.target.result;
             if(!db.objectStoreNames.contains('schools')) db.createObjectStore('schools', {keyPath:'name'});
@@ -231,35 +222,22 @@
             const tx = db.transaction(['schools'], 'readonly');
             tx.objectStore('schools').getAll().onsuccess = e => {
                 const schools = e.target.result;
-                const div = document.getElementById('schoolListDisplay');
-                div.innerHTML = '';
                 
-                // Logic: Disable adding multiple schools (Single School Mode)
+                // --- NEW LOGIC: AUTO ENTER ---
                 if(schools.length > 0) {
-                    document.getElementById('addSchoolCard').classList.add('hidden');
+                    // School exists, bypass registration page
+                    enterSchool(schools[0]);
                 } else {
-                    document.getElementById('addSchoolCard').classList.remove('hidden');
+                    // No school, show registration
+                    document.getElementById('schoolSection').classList.remove('hidden');
+                    document.getElementById('entrySection').classList.add('hidden');
                 }
-
-                schools.forEach(s => {
-                    const el = document.createElement('div');
-                    el.className = 'school-item';
-                    el.innerHTML = `
-                        <span>🏫 <b>${s.name}</b></span><br>
-                        <small>${s.phone || ''}</small><br>
-                        <small style="color:#666;">${s.block || ''}, ${s.district || ''}</small>
-                        <div style="font-size:12px; color:#0056b3; margin-top:5px; font-weight:bold;">Tap to Enter</div>
-                        <div class="school-del" onclick="delSchool(event, '${s.name}')">×</div>
-                    `;
-                    el.onclick = (ev) => { if(ev.target.className !== 'school-del') enterSchool(s); };
-                    div.appendChild(el);
-                });
             };
         }
 
         document.getElementById('addSchoolBtn').onclick = async () => {
             const name = document.getElementById('newSchoolName').value.trim();
-            const phone = document.getElementById('newSchoolPhone').value.trim(); // Added
+            const phone = document.getElementById('newSchoolPhone').value.trim();
             const block = document.getElementById('newBlock').value.trim();
             const district = document.getElementById('newDistrict').value.trim();
             const pin = document.getElementById('newPin').value.trim();
@@ -287,29 +265,22 @@
             const tx = db.transaction(['schools'], 'readwrite');
             tx.objectStore('schools').put(schoolObj);
             tx.oncomplete = () => { 
-                document.getElementById('newSchoolName').value=''; 
-                document.getElementById('newSchoolPhone').value='';
-                document.getElementById('newBlock').value='';
-                document.getElementById('newDistrict').value='';
-                document.getElementById('newPin').value='';
-                document.getElementById('hmSignInput').value='';
-                document.getElementById('signPreview').style.display='none';
-                document.getElementById('addSchoolBtn').textContent = "Submit";
-                loadSchools(); 
+                // Don't clear form, just jump to next page
+                enterSchool(schoolObj);
             };
         };
 
-        function delSchool(e, name) {
-            e.stopPropagation();
-            if(confirm('Delete school and all local data?')) {
-                db.transaction(['schools'], 'readwrite').objectStore('schools').delete(name);
-                const tx = db.transaction(['students'], 'readwrite');
-                const idx = tx.objectStore('students').index('schoolName');
-                idx.getAll(name).onsuccess = res => {
-                    res.target.result.forEach(s => tx.objectStore('students').delete(s.id));
-                };
-                loadSchools();
-            }
+        // Replaced "delSchool" with this Reset function inside the modal
+        function hardResetApp() {
+            if(!confirm('WARNING: This will delete the school and all student data from this device. Continue?')) return;
+            
+            const tx = db.transaction(['schools', 'students'], 'readwrite');
+            tx.objectStore('schools').clear();
+            tx.objectStore('students').clear();
+            
+            tx.oncomplete = () => {
+                location.reload(); // Reload to show the registration form again
+            };
         }
 
         function enterSchool(schoolObj) {
@@ -328,18 +299,10 @@
             document.getElementById('currentSchoolSubHeader').textContent = `${currentSchoolData.phone || ''} | ${currentSchoolData.block || ''}, ${currentSchoolData.district || ''}`;
         }
 
-        function exitSchool() {
-            currentSchool = null;
-            currentSchoolData = null;
-            document.getElementById('schoolSection').classList.remove('hidden');
-            document.getElementById('entrySection').classList.add('hidden');
-            resetForm();
-        }
-
         // --- EDIT SCHOOL LOGIC ---
         function openEditSchoolModal() {
             document.getElementById('editSchoolNameInput').value = currentSchoolData.name;
-            document.getElementById('editSchoolPhoneInput').value = currentSchoolData.phone || ''; // Added
+            document.getElementById('editSchoolPhoneInput').value = currentSchoolData.phone || '';
             document.getElementById('editSchoolBlock').value = currentSchoolData.block || '';
             document.getElementById('editSchoolDistrict').value = currentSchoolData.district || '';
             document.getElementById('editSchoolPin').value = currentSchoolData.pin || '';
@@ -349,7 +312,7 @@
 
         document.getElementById('saveSchoolEditBtn').onclick = async () => {
             const newName = document.getElementById('editSchoolNameInput').value.trim();
-            const newPhone = document.getElementById('editSchoolPhoneInput').value.trim(); // Added
+            const newPhone = document.getElementById('editSchoolPhoneInput').value.trim();
             const newBlock = document.getElementById('editSchoolBlock').value.trim();
             const newDistrict = document.getElementById('editSchoolDistrict').value.trim();
             const newPin = document.getElementById('editSchoolPin').value.trim();
