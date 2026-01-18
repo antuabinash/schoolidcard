@@ -503,21 +503,18 @@ document.getElementById('generateBtn').onclick = async () => {
             if(i > 0) verifyPdf.addPage([CARD_W, CARD_H], 'portrait');
             verifyPdf.addImage(img, 'PNG', 0, 0, CARD_W, CARD_H);
             
-            // --- DRAW WATERMARK (CROSS & TEXT) ---
+            // --- DRAW WATERMARK (REPEATING TEXT) ---
             verifyPdf.saveGraphicsState();
-            verifyPdf.setGState(new verifyPdf.GState({opacity: 0.5}));
-            
-            // Red Cross
-            verifyPdf.setDrawColor(255, 0, 0); // Red
-            verifyPdf.setLineWidth(5);
-            verifyPdf.line(0, 0, CARD_W, CARD_H);
-            verifyPdf.line(CARD_W, 0, 0, CARD_H);
-
-            // Text Overlay
-            verifyPdf.setTextColor(255, 0, 0);
+            verifyPdf.setGState(new verifyPdf.GState({opacity: 0.3})); // 30% Opacity
+            verifyPdf.setTextColor(255, 0, 0); // Red
             verifyPdf.setFontSize(30);
-            // Translate to center to rotate text nicely
-            verifyPdf.text("VERIFICATION ONLY", CARD_W/2, CARD_H/2, {align:'center', angle: 45});
+
+            // Loop to cover the card with text
+            for (let r = -50; r < CARD_H + 50; r += 150) {
+                for (let c = -50; c < CARD_W + 50; c += 200) {
+                     verifyPdf.text("VERIFICATION ONLY", c, r, {angle: 45});
+                }
+            }
             
             verifyPdf.restoreGraphicsState();
             // -------------------------------------
