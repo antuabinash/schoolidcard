@@ -277,6 +277,7 @@ function loadData(){
                 }
                 schoolsMap[d.schoolName].count++;
                 
+                // Prioritize finding valid metadata
                 const sm = schoolsMap[d.schoolName];
                 if(!sm.signature && d.hmSignature) sm.signature = d.hmSignature;
                 if(!sm.block && d.block) sm.block = d.block;
