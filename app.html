@@ -23,7 +23,6 @@
         .btn-primary { background: #0056b3; }
         .btn-success { background: #28a745; }
         .btn-danger { background: #dc3545; }
-        .btn-warning { background: #ffc107; color: #333; }
         .btn-outline { background: transparent; border: 1px solid #0056b3; color: #0056b3; }
         
         /* School Grid */
@@ -62,11 +61,12 @@
     <div class="container">
         
         <div id="schoolSection">
-            <h2 style="text-align:center; color:#0056b3;">Select School</h2>
+            <h2 style="text-align:center; color:#0056b3;">School Registration</h2>
             
             <div class="card" id="addSchoolCard">
                 <label>School Details</label>
                 <input type="text" id="newSchoolName" placeholder="Enter School Name">
+                <input type="tel" id="newSchoolPhone" placeholder="School Contact Number">
                 
                 <div class="row-inputs">
                     <input type="text" id="newBlock" placeholder="Block">
@@ -78,7 +78,7 @@
                 <input type="file" id="hmSignInput" accept="image/*">
                 <img id="signPreview" class="preview-thumb">
 
-                <button class="btn btn-primary" id="addSchoolBtn">Add School</button>
+                <button class="btn btn-primary" id="addSchoolBtn">Submit</button>
             </div>
 
             <div id="schoolListDisplay" class="school-list"></div>
@@ -150,6 +150,9 @@
             
             <label>School Name</label>
             <input type="text" id="editSchoolNameInput">
+
+            <label>Contact Number</label>
+            <input type="tel" id="editSchoolPhoneInput">
             
             <div class="row-inputs">
                 <input type="text" id="editSchoolBlock" placeholder="Block">
@@ -194,7 +197,7 @@
         let db, currentSchool = null, currentSchoolData = null, students = [], currentPhotoBlob = null;
         
         // DB INIT
-        const req = indexedDB.open('SchoolDataApp', 4); // Bumped version to 4
+        const req = indexedDB.open('SchoolDataApp', 5); // Bumped version to 5 for phone field
         req.onupgradeneeded = e => {
             db = e.target.result;
             if(!db.objectStoreNames.contains('schools')) db.createObjectStore('schools', {keyPath:'name'});
@@ -231,7 +234,7 @@
                 const div = document.getElementById('schoolListDisplay');
                 div.innerHTML = '';
                 
-                // Logic: Disable adding multiple schools
+                // Logic: Disable adding multiple schools (Single School Mode)
                 if(schools.length > 0) {
                     document.getElementById('addSchoolCard').classList.add('hidden');
                 } else {
@@ -243,7 +246,8 @@
                     el.className = 'school-item';
                     el.innerHTML = `
                         <span>🏫 <b>${s.name}</b></span><br>
-                        <small style="color:#666;">${s.block || ''}, ${s.district || ''} - ${s.pin || ''}</small>
+                        <small>${s.phone || ''}</small><br>
+                        <small style="color:#666;">${s.block || ''}, ${s.district || ''}</small>
                         <div style="font-size:12px; color:#0056b3; margin-top:5px; font-weight:bold;">Tap to Enter</div>
                         <div class="school-del" onclick="delSchool(event, '${s.name}')">×</div>
                     `;
@@ -255,6 +259,7 @@
 
         document.getElementById('addSchoolBtn').onclick = async () => {
             const name = document.getElementById('newSchoolName').value.trim();
+            const phone = document.getElementById('newSchoolPhone').value.trim(); // Added
             const block = document.getElementById('newBlock').value.trim();
             const district = document.getElementById('newDistrict').value.trim();
             const pin = document.getElementById('newPin').value.trim();
@@ -262,7 +267,7 @@
 
             if(!name) return alert("Enter School Name");
             
-            document.getElementById('addSchoolBtn').textContent = "Saving...";
+            document.getElementById('addSchoolBtn').textContent = "Processing...";
             
             let signBase64 = null;
             if(signFile) {
@@ -271,6 +276,7 @@
 
             const schoolObj = {
                 name: name,
+                phone: phone,
                 block: block,
                 district: district,
                 pin: pin,
@@ -282,12 +288,13 @@
             tx.objectStore('schools').put(schoolObj);
             tx.oncomplete = () => { 
                 document.getElementById('newSchoolName').value=''; 
+                document.getElementById('newSchoolPhone').value='';
                 document.getElementById('newBlock').value='';
                 document.getElementById('newDistrict').value='';
                 document.getElementById('newPin').value='';
                 document.getElementById('hmSignInput').value='';
                 document.getElementById('signPreview').style.display='none';
-                document.getElementById('addSchoolBtn').textContent = "Add School";
+                document.getElementById('addSchoolBtn').textContent = "Submit";
                 loadSchools(); 
             };
         };
@@ -318,7 +325,7 @@
 
         function updateSchoolHeader() {
             document.getElementById('currentSchoolHeader').textContent = currentSchoolData.name;
-            document.getElementById('currentSchoolSubHeader').textContent = `${currentSchoolData.block || ''}, ${currentSchoolData.district || ''}`;
+            document.getElementById('currentSchoolSubHeader').textContent = `${currentSchoolData.phone || ''} | ${currentSchoolData.block || ''}, ${currentSchoolData.district || ''}`;
         }
 
         function exitSchool() {
@@ -332,6 +339,7 @@
         // --- EDIT SCHOOL LOGIC ---
         function openEditSchoolModal() {
             document.getElementById('editSchoolNameInput').value = currentSchoolData.name;
+            document.getElementById('editSchoolPhoneInput').value = currentSchoolData.phone || ''; // Added
             document.getElementById('editSchoolBlock').value = currentSchoolData.block || '';
             document.getElementById('editSchoolDistrict').value = currentSchoolData.district || '';
             document.getElementById('editSchoolPin').value = currentSchoolData.pin || '';
@@ -341,6 +349,7 @@
 
         document.getElementById('saveSchoolEditBtn').onclick = async () => {
             const newName = document.getElementById('editSchoolNameInput').value.trim();
+            const newPhone = document.getElementById('editSchoolPhoneInput').value.trim(); // Added
             const newBlock = document.getElementById('editSchoolBlock').value.trim();
             const newDistrict = document.getElementById('editSchoolDistrict').value.trim();
             const newPin = document.getElementById('editSchoolPin').value.trim();
@@ -353,6 +362,7 @@
             // Prepare updated object
             const updatedSchool = { ...currentSchoolData };
             updatedSchool.name = newName;
+            updatedSchool.phone = newPhone;
             updatedSchool.block = newBlock;
             updatedSchool.district = newDistrict;
             updatedSchool.pin = newPin;
