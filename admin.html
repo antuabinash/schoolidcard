@@ -505,7 +505,7 @@ document.getElementById('generateBtn').onclick = async () => {
             
             // --- DRAW WATERMARK (REPEATING TEXT) ---
             verifyPdf.saveGraphicsState();
-            verifyPdf.setGState(new verifyPdf.GState({opacity: 0.3})); // 30% Opacity
+            verifyPdf.setGState(new verifyPdf.GState({opacity: 0.2})); // 20% Opacity
             verifyPdf.setTextColor(255, 0, 0); // Red
             verifyPdf.setFontSize(30);
 
