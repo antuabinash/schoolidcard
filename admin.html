@@ -350,10 +350,14 @@ function renderTable(){
     document.getElementById('selectAll').checked = false;
     currentSchoolStudents.forEach((s, i) => {
         const tr = document.createElement('tr');
+        
+        // --- FIX BELOW: Added '|| s.phone' to the mobile column ---
         tr.innerHTML = `<td><input type="checkbox" class="sel" value="${s.id}"></td><td>${i+1}</td>
         <td><img class="thumb" src="${s.photoBase64 || ''}"></td>
-        <td>${s.name}</td><td>${s.class}</td><td>${s.roll}</td><td>${s.dob}</td><td>${s.bloodGroup||''}</td><td>${s.mobile||''}</td>
+        <td>${s.name}</td><td>${s.class}</td><td>${s.roll}</td><td>${s.dob}</td><td>${s.bloodGroup||''}</td>
+        <td>${s.mobile || s.phone || ''}</td> 
         <td><button class="btn btn-primary" onclick="openEditModal('${s.id}')">✎</button> <button class="btn btn-danger" onclick="del('${s.id}')">🗑</button></td>`;
+        
         tbody.appendChild(tr);
     });
     document.querySelectorAll('.sel').forEach(c => c.onchange = updateSelection);
